@@ -1,0 +1,733 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: SEO Intelligence Platform API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: projects
+    description: SEO project management
+  - name: analyses
+    description: SEO analysis operations
+  - name: keywords
+    description: Keyword tracking
+  - name: recommendations
+    description: AI-powered recommendations
+  - name: dashboard
+    description: Dashboard and reporting
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # Projects
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List all projects
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a new project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectBody"
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a project by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      summary: Delete a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # Analyses
+  /analyses:
+    get:
+      operationId: listAnalyses
+      tags: [analyses]
+      summary: List analyses
+      parameters:
+        - name: projectId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+            enum: [website, youtube, instagram, null]
+      responses:
+        "200":
+          description: List of analyses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Analysis"
+    post:
+      operationId: createAnalysis
+      tags: [analyses]
+      summary: Submit a URL for analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAnalysisBody"
+      responses:
+        "201":
+          description: Analysis created and queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Analysis"
+
+  /analyses/{id}:
+    get:
+      operationId: getAnalysis
+      tags: [analyses]
+      summary: Get analysis details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Full analysis report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisDetail"
+        "404":
+          description: Not found
+
+  /analyses/{id}/rerun:
+    post:
+      operationId: rerunAnalysis
+      tags: [analyses]
+      summary: Re-run an existing analysis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Re-queued analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Analysis"
+
+  # Keywords
+  /keywords:
+    get:
+      operationId: listKeywords
+      tags: [keywords]
+      summary: List tracked keywords
+      parameters:
+        - name: projectId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: List of keywords
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Keyword"
+    post:
+      operationId: createKeyword
+      tags: [keywords]
+      summary: Add a keyword to track
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateKeywordBody"
+      responses:
+        "201":
+          description: Keyword created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Keyword"
+
+  /keywords/{id}:
+    delete:
+      operationId: deleteKeyword
+      tags: [keywords]
+      summary: Stop tracking a keyword
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /keywords/{id}/history:
+    get:
+      operationId: getKeywordHistory
+      tags: [keywords]
+      summary: Get keyword ranking history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Keyword ranking history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KeywordRankEntry"
+
+  # Recommendations
+  /recommendations:
+    get:
+      operationId: listRecommendations
+      tags: [recommendations]
+      summary: List recommendations
+      parameters:
+        - name: analysisId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: priority
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+            enum: [high, medium, low, null]
+      responses:
+        "200":
+          description: List of recommendations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Recommendation"
+
+  /recommendations/{id}/dismiss:
+    patch:
+      operationId: dismissRecommendation
+      tags: [recommendations]
+      summary: Dismiss a recommendation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated recommendation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Recommendation"
+
+  # Dashboard
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get aggregate dashboard stats
+      responses:
+        "200":
+          description: Dashboard summary metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/score-trend:
+    get:
+      operationId: getScoreTrend
+      tags: [dashboard]
+      summary: Get SEO score trend over time per project
+      parameters:
+        - name: projectId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Score trend data points
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScoreTrendPoint"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Get recent analyses and keyword additions
+      responses:
+        "200":
+          description: Recent activity items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  /dashboard/issue-breakdown:
+    get:
+      operationId: getIssueBreakdown
+      tags: [dashboard]
+      summary: Get counts of issues by category
+      responses:
+        "200":
+          description: Issue breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/IssueBreakdownItem"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        domain:
+          type: string
+        description:
+          type: ["string", "null"]
+        totalAnalyses:
+          type: integer
+        latestScore:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - name
+        - domain
+        - totalAnalyses
+        - createdAt
+        - updatedAt
+
+    CreateProjectBody:
+      type: object
+      properties:
+        name:
+          type: string
+        domain:
+          type: string
+        description:
+          type: ["string", "null"]
+      required:
+        - name
+        - domain
+
+    Analysis:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: ["integer", "null"]
+        url:
+          type: string
+        type:
+          type: string
+          enum: [website, youtube, instagram]
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        seoScore:
+          type: ["integer", "null"]
+        issueCount:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+        completedAt:
+          type: ["string", "null"]
+      required:
+        - id
+        - url
+        - type
+        - status
+        - createdAt
+
+    CreateAnalysisBody:
+      type: object
+      properties:
+        url:
+          type: string
+        type:
+          type: string
+          enum: [website, youtube, instagram]
+        projectId:
+          type: ["integer", "null"]
+      required:
+        - url
+        - type
+
+    AnalysisDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: ["integer", "null"]
+        url:
+          type: string
+        type:
+          type: string
+          enum: [website, youtube, instagram]
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        seoScore:
+          type: ["integer", "null"]
+        issueCount:
+          type: ["integer", "null"]
+        metaTitle:
+          type: ["string", "null"]
+        metaDescription:
+          type: ["string", "null"]
+        h1Count:
+          type: ["integer", "null"]
+        h2Count:
+          type: ["integer", "null"]
+        wordCount:
+          type: ["integer", "null"]
+        internalLinks:
+          type: ["integer", "null"]
+        externalLinks:
+          type: ["integer", "null"]
+        imagesMissingAlt:
+          type: ["integer", "null"]
+        pageLoadScore:
+          type: ["integer", "null"]
+        mobileScore:
+          type: ["integer", "null"]
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/SeoIssue"
+        recommendations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Recommendation"
+        createdAt:
+          type: string
+        completedAt:
+          type: ["string", "null"]
+      required:
+        - id
+        - url
+        - type
+        - status
+        - issues
+        - recommendations
+        - createdAt
+
+    SeoIssue:
+      type: object
+      properties:
+        id:
+          type: integer
+        analysisId:
+          type: integer
+        category:
+          type: string
+        severity:
+          type: string
+          enum: [critical, warning, info]
+        title:
+          type: string
+        description:
+          type: string
+        affectedUrl:
+          type: ["string", "null"]
+        element:
+          type: ["string", "null"]
+        lineNumber:
+          type: ["integer", "null"]
+        fixExample:
+          type: ["string", "null"]
+        helpUrl:
+          type: ["string", "null"]
+      required:
+        - id
+        - analysisId
+        - category
+        - severity
+        - title
+        - description
+
+    Recommendation:
+      type: object
+      properties:
+        id:
+          type: integer
+        analysisId:
+          type: integer
+        priority:
+          type: string
+          enum: [high, medium, low]
+        category:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        estimatedImpact:
+          type: integer
+        dismissed:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - analysisId
+        - priority
+        - category
+        - title
+        - description
+        - estimatedImpact
+        - dismissed
+        - createdAt
+
+    Keyword:
+      type: object
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        keyword:
+          type: string
+        currentRank:
+          type: ["integer", "null"]
+        previousRank:
+          type: ["integer", "null"]
+        searchVolume:
+          type: ["integer", "null"]
+        difficulty:
+          type: ["integer", "null"]
+        trend:
+          type: ["string", "null"]
+          enum: [up, down, stable, null]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - projectId
+        - keyword
+        - createdAt
+        - updatedAt
+
+    CreateKeywordBody:
+      type: object
+      properties:
+        projectId:
+          type: integer
+        keyword:
+          type: string
+        searchVolume:
+          type: ["integer", "null"]
+        difficulty:
+          type: ["integer", "null"]
+      required:
+        - projectId
+        - keyword
+
+    KeywordRankEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        keywordId:
+          type: integer
+        rank:
+          type: ["integer", "null"]
+        recordedAt:
+          type: string
+      required:
+        - id
+        - keywordId
+        - recordedAt
+
+    DashboardSummary:
+      type: object
+      properties:
+        totalProjects:
+          type: integer
+        totalAnalyses:
+          type: integer
+        totalKeywords:
+          type: integer
+        avgSeoScore:
+          type: ["integer", "null"]
+        criticalIssues:
+          type: integer
+        pendingAnalyses:
+          type: integer
+        topPerformingProject:
+          type: ["string", "null"]
+        recommendationsPending:
+          type: integer
+      required:
+        - totalProjects
+        - totalAnalyses
+        - totalKeywords
+        - criticalIssues
+        - pendingAnalyses
+        - recommendationsPending
+
+    ScoreTrendPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        score:
+          type: integer
+        projectName:
+          type: string
+      required:
+        - date
+        - score
+        - projectName
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [analysis, keyword, project]
+        description:
+          type: string
+        url:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - type
+        - description
+        - createdAt
+
+    IssueBreakdownItem:
+      type: object
+      properties:
+        category:
+          type: string
+        count:
+          type: integer
+        severity:
+          type: string
+          enum: [critical, warning, info]
+      required:
+        - category
+        - count
+        - severity
