@@ -166,6 +166,21 @@ paths:
                 $ref: "#/components/schemas/AnalysisDetail"
         "404":
           description: Not found
+    delete:
+      operationId: deleteAnalysis
+      tags: [analyses]
+      summary: Delete an analysis and its data
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
 
   /analyses/{id}/rerun:
     post:

@@ -158,6 +158,13 @@ export const GetAnalysisResponse = zod.object({
 });
 
 /**
+ * @summary Delete an analysis and its data
+ */
+export const DeleteAnalysisParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
  * @summary Re-run an existing analysis
  */
 export const RerunAnalysisParams = zod.object({

@@ -84,6 +84,27 @@ router.get("/analyses/:id", async (req, res): Promise<void> => {
   });
 });
 
+router.delete("/analyses/:id", async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+
+  const [existing] = await db.select().from(analysesTable).where(eq(analysesTable.id, id));
+  if (!existing) {
+    res.status(404).json({ error: "Analysis not found" });
+    return;
+  }
+
+  await db.delete(seoIssuesTable).where(eq(seoIssuesTable.analysisId, id));
+  await db.delete(recommendationsTable).where(eq(recommendationsTable.analysisId, id));
+  await db.delete(analysesTable).where(eq(analysesTable.id, id));
+
+  res.status(204).end();
+});
+
 router.post("/analyses/:id/rerun", async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const params = RerunAnalysisParams.safeParse({ id: parseInt(raw, 10) });

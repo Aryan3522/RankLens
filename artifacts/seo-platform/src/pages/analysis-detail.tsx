@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useGetAnalysis, getGetAnalysisQueryKey, useRerunAnalysis, getListAnalysesQueryKey } from "@workspace/api-client-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   ArrowLeft, RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle, Info,
-  Globe, Youtube, Instagram, ExternalLink, ChevronDown, ChevronUp, Code, Wrench, BookOpen
+  Globe, Youtube, Instagram, ExternalLink, ChevronDown, ChevronUp, Code, Wrench, BookOpen, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -209,6 +209,28 @@ export default function AnalysisDetail({ id }: { id: number }) {
   const rerun = useRerunAnalysis();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+      return;
+    }
+    setDeleting(true);
+    try {
+      await fetch(`/api/analyses/${id}`, { method: "DELETE" });
+      queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
+      toast({ title: "Analysis deleted" });
+      navigate("/analyzer");
+    } catch {
+      toast({ title: "Error", description: "Could not delete analysis.", variant: "destructive" });
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
 
   const handleRerun = () => {
     rerun.mutate({ id }, {
@@ -282,6 +304,20 @@ export default function AnalysisDetail({ id }: { id: number }) {
         >
           <RefreshCw className={`w-3.5 h-3.5 ${rerun.isPending ? "animate-spin" : ""}`} />
           Re-run
+        </Button>
+        <Button
+          variant={confirmDelete ? "destructive" : "outline"}
+          size="sm"
+          onClick={handleDelete}
+          disabled={deleting}
+          className="gap-2 shrink-0"
+          data-testid="button-delete"
+        >
+          {deleting
+            ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            : <Trash2 className="w-3.5 h-3.5" />
+          }
+          {deleting ? "Deleting…" : confirmDelete ? "Confirm delete?" : "Delete"}
         </Button>
       </div>
 
