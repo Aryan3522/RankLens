@@ -2,16 +2,15 @@ import express, { type Express } from "express";
 import cors from "cors";
 import { pinoHttp } from "pino-http";
 import session from "express-session";
-import pgSession from "connect-pg-simple";
 import passport from "./lib/auth/passport.js";
 import { rateLimit } from "express-rate-limit";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
-import { pool } from "./db/index.js";
-
-const PostgresStore = pgSession(session);
 
 const app: Express = express();
+
+// --- Trust Proxy for Vercel/Render ---
+app.set("trust proxy", 1);
 
 // --- Middleware Setup ---
 const clientUrl = (process.env.CLIENT_URL || "http://localhost:8081").replace(/\/$/, "");
@@ -51,16 +50,15 @@ app.use(express.urlencoded({ extended: true }));
 // --- Session & Auth Setup ---
 app.use(
   session({
-    store: new PostgresStore({ pool, tableName: "session" }),
     secret: process.env.SESSION_SECRET || "development-secret",
     resave: false,
     saveUninitialized: false,
-    proxy: process.env.NODE_ENV === "production",
+    proxy: true,
     cookie: {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       httpOnly: true,
-      secure: true, // Always true to support sameSite: 'none'
-      sameSite: "none", // Required for cross-site cookies between Render and Vercel
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     },
   })
 );

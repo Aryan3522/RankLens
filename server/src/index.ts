@@ -22,12 +22,12 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 if (process.env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
-  app.listen(port, (err) => {
+  app.listen(port, "0.0.0.0", (err) => {
     if (err) {
       logger.error({ err }, "Error listening on port");
       process.exit(1);
     }
-    logger.info({ port }, "Server listening");
+    logger.info({ port }, "Server listening on 0.0.0.0");
   });
 }
 
