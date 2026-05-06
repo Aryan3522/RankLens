@@ -14,43 +14,9 @@ const PostgresStore = pgSession(session);
 const app: Express = express();
 
 // --- Middleware Setup ---
-app.use(cors({ origin: true, credentials: true })); // Enable credentials for sessions
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+const clientUrl = process.env.CLIENT_URL || "http://localhost:8081";
 
-// --- Session & Auth Setup ---
-app.use(
-  session({
-    store: new PostgresStore({ pool, tableName: "session" }),
-    secret: process.env.SESSION_SECRET || "development-secret",
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    },
-  })
-);
-
-app.use(passport.initialize());
-app.use(passport.session());
-
-// --- Rate Limiting (Load Balancer Logic) ---
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP or User to 100 requests per window
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: { keyGeneratorIpFallback: false }, // Correct validation key
-  message: { error: "Too many requests, please try again later." },
-  // Future-proof: If auth is added, we use the user ID, otherwise fallback to IP
-  keyGenerator: (req) => {
-    return (req as any).user?.id?.toString() || req.ip || "anonymous";
-  },
-});
-
+// Logger first
 app.use(
   pinoHttp({
     logger,
@@ -71,11 +37,49 @@ app.use(
   }),
 );
 
-app.use(cors());
+// CORS restricted to CLIENT_URL for security
+app.use(cors({ 
+  origin: clientUrl === "true" ? true : clientUrl, 
+  credentials: true 
+})); 
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Apply rate limiter to all /api routes
+// --- Session & Auth Setup ---
+app.use(
+  session({
+    store: new PostgresStore({ pool, tableName: "session" }),
+    secret: process.env.SESSION_SECRET || "development-secret",
+    resave: false,
+    saveUninitialized: false,
+    proxy: process.env.NODE_ENV === "production",
+    cookie: {
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    },
+  })
+);
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+// --- Rate Limiting ---
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { keyGeneratorIpFallback: false },
+  message: { error: "Too many requests, please try again later." },
+  keyGenerator: (req) => {
+    return (req as any).user?.id?.toString() || req.ip || "anonymous";
+  },
+});
+
+// Apply rate limiter and routes
 app.use("/api", apiLimiter, router);
 
 export default app;
