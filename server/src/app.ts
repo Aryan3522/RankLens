@@ -14,7 +14,9 @@ const PostgresStore = pgSession(session);
 const app: Express = express();
 
 // --- Middleware Setup ---
-const clientUrl = process.env.CLIENT_URL || "http://localhost:8081";
+const clientUrl = (process.env.CLIENT_URL || "http://localhost:8081").replace(/\/$/, "");
+
+logger.info({ allowedOrigin: clientUrl }, "CORS configuration");
 
 // Logger first
 app.use(
