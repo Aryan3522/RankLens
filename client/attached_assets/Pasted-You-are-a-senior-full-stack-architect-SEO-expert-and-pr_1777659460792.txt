@@ -1,4 +1,12 @@
-You are a senior full-stack architect, SEO expert, and product designer.
+server: {
+    port: 8081,
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8080",
+        changeOrigin: true,
+      },
+    },
+  },You are a senior full-stack architect, SEO expert, and product designer.
 
 Your task is to design and build a full-fledged SaaS web application called "SEO Intelligence Platform" that analyzes, tracks, and improves SEO performance across websites, YouTube, and Instagram.
 
