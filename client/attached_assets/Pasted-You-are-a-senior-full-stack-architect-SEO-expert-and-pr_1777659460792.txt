@@ -1,0 +1,240 @@
+You are a senior full-stack architect, SEO expert, and product designer.
+
+Your task is to design and build a full-fledged SaaS web application called "SEO Intelligence Platform" that analyzes, tracks, and improves SEO performance across websites, YouTube, and Instagram.
+
+The system must be scalable, modular, production-ready, and designed with modern best practices.
+
+-----------------------------------
+🎯 CORE OBJECTIVE
+-----------------------------------
+Build a platform where users can:
+1. Input a website URL, YouTube video URL, or Instagram content URL
+2. The system crawls, analyzes, and extracts SEO-relevant data
+3. Provides actionable, prioritized SEO recommendations
+4. Tracks keyword performance and visibility improvements over time
+
+-----------------------------------
+🧠 CORE FEATURES
+-----------------------------------
+
+### 1. Website SEO Analyzer
+- Crawl entire website starting from root URL
+- Parse and analyze:
+  - Meta tags (title, description, keywords)
+  - Heading hierarchy (H1–H6)
+  - Keyword density
+  - Internal linking structure
+  - Image alt tags
+  - Page speed signals (LCP, CLS, etc.)
+  - Mobile responsiveness indicators
+- Detect SEO issues:
+  - Missing meta tags
+  - Duplicate content
+  - Broken links (404s)
+  - Thin content pages
+  - Improper heading usage
+- Generate structured report:
+  - SEO score (0–100)
+  - Critical issues
+  - Improvement suggestions
+
+---
+
+### 2. Advanced Web Crawler
+- Crawl all pages using BFS/DFS strategy
+- Respect robots.txt rules
+- Parse sitemap.xml automatically
+- Extract:
+  - All internal URLs
+  - External links
+  - Crawl depth
+- Detect:
+  - Orphan pages
+  - Crawl errors
+  - Redirect chains
+- Maintain crawl logs
+
+---
+
+### 3. Keyword Tracking System
+- Allow users to:
+  - Add target keywords
+  - Track keyword ranking over time
+- Analyze:
+  - Keyword frequency across pages
+  - Keyword placement (title, headers, body)
+- Suggest:
+  - Missing keywords
+  - Overused keywords (keyword stuffing)
+  - Long-tail keyword opportunities
+
+---
+
+### 4. SEO Recommendation Engine (AI-based)
+- Generate:
+  - Content improvement suggestions
+  - Keyword insertion suggestions
+  - Meta tag rewrites
+- Provide:
+  - Priority-based recommendations (High / Medium / Low)
+  - Estimated SEO impact score
+
+---
+
+### 5. YouTube SEO Analyzer
+- Input: YouTube video URL
+- Extract:
+  - Title
+  - Description
+  - Tags
+  - Thumbnail quality (basic visual analysis)
+- Analyze:
+  - Keyword optimization
+  - CTR potential
+  - Title effectiveness
+- Suggest:
+  - Better titles
+  - Tags improvements
+  - Thumbnail strategy
+  - Content structure tips
+
+---
+
+### 6. Instagram Content Analyzer
+- Input: Instagram post/reel URL
+- Analyze:
+  - Caption
+  - Hashtags
+  - Engagement potential
+- Suggest:
+  - Optimal hashtag strategy
+  - Caption improvements
+  - Content formatting tips
+
+---
+
+### 7. SEO Visibility Strategy Module
+- Provide insights on:
+  - How to increase organic reach
+  - Content strategy improvements
+  - Blogging recommendations
+  - Backlink strategies
+- Generate:
+  - Weekly SEO improvement plan
+
+---
+
+### 8. Dashboard & Reporting
+- Clean analytics dashboard:
+  - SEO score trends
+  - Keyword ranking graphs
+  - Crawl insights
+- Export reports (PDF/CSV)
+
+---
+
+-----------------------------------
+🧱 TECH STACK REQUIREMENTS
+-----------------------------------
+
+Frontend:
+- React (Next.js preferred)
+- Tailwind CSS (minimal, clean UI)
+- Chart library (Recharts or Chart.js)
+
+Backend:
+- Node.js (Express or NestJS)
+- REST API or GraphQL
+
+Database:
+- PostgreSQL (primary)
+- Redis (caching + queue)
+
+Crawler Engine:
+- Puppeteer / Playwright
+- Queue system (BullMQ / RabbitMQ)
+
+AI Integration:
+- OpenAI API (for suggestions + NLP)
+
+Deployment:
+- Dockerized services
+- CI/CD pipeline
+- Cloud hosting (AWS / Vercel / GCP)
+
+---
+
+-----------------------------------
+🎨 UI/UX REQUIREMENTS
+-----------------------------------
+
+Design must be:
+- Minimal
+- Clean
+- Modern
+- Developer-friendly
+
+Pages:
+1. Landing Page
+2. Dashboard
+3. URL Analyzer Page
+4. Keyword Tracker Page
+5. Reports Page
+
+UI Principles:
+- Card-based layout
+- Clear typography
+- Neutral color palette
+- Fast loading
+
+---
+
+-----------------------------------
+⚙️ SYSTEM DESIGN CONSIDERATIONS
+-----------------------------------
+
+- Microservices architecture (crawler, analyzer, AI engine separate)
+- Rate limiting for crawlers
+- Async job processing
+- Scalable queue system
+- Error handling & retries
+- Data caching layer
+
+---
+
+-----------------------------------
+🔐 AUTH & USER MANAGEMENT
+-----------------------------------
+
+- JWT-based authentication
+- User dashboards
+- Subscription tiers (Free / Pro / Enterprise)
+
+---
+
+-----------------------------------
+📈 FUTURE ENHANCEMENTS
+-----------------------------------
+
+- Competitor analysis
+- Backlink tracking
+- Google Search Console integration
+- Chrome extension
+
+---
+
+-----------------------------------
+📦 OUTPUT REQUIREMENTS
+-----------------------------------
+
+Provide:
+1. Full system architecture diagram
+2. Database schema
+3. API endpoints structure
+4. Sample UI wireframes
+5. Code snippets for:
+   - Web crawler
+   - Keyword analyzer
+   - AI recommendation engine
+
+Ensure all code is production-ready and modular.
