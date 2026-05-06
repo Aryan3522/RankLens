@@ -17,13 +17,18 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 // Start auto-deletion cleanup task (3 days TTL)
-startCleanupTask();
+if (process.env.NODE_ENV !== "test") {
+  startCleanupTask();
+}
 
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
-  }
+if (process.env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
+  app.listen(port, (err) => {
+    if (err) {
+      logger.error({ err }, "Error listening on port");
+      process.exit(1);
+    }
+    logger.info({ port }, "Server listening");
+  });
+}
 
-  logger.info({ port }, "Server listening");
-});
+export default app;
