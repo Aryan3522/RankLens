@@ -7,12 +7,14 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "./lib/auth/passport.js";
 import { rateLimit } from "express-rate-limit";
+import jwt from "jsonwebtoken";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { pool } from "./db/index.js";
 
 const app: Express = express();
 const PostgresStore = connectPgSimple(session);
+const JWT_SECRET = process.env.SESSION_SECRET || "development-secret";
 
 // --- Security & Performance ---
 app.use(helmet()); // Sets various security headers
@@ -58,7 +60,23 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// --- JWT Middleware ---
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      req.user = decoded;
+    } catch (err) {
+      logger.debug({ err }, "Invalid JWT token");
+    }
+  }
+  next();
+});
+
 // --- Session & Auth Setup ---
+// Keeping sessions for legacy/fallback support if needed, but primary will be JWT
 if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
   logger.error("SESSION_SECRET is required in production!");
 }
