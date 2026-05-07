@@ -1,12 +1,17 @@
-import { createContext, useContext, ReactNode } from "react";
+import { createContext, useContext, ReactNode, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { customFetch } from "@/api/custom-fetch";
+import { customFetch, setAuthTokenGetter } from "@/api/custom-fetch";
 import { useToast } from "./use-toast";
 
 type User = {
   id: number;
   email: string;
   name: string | null;
+};
+
+type AuthResponse = {
+  token: string;
+  user: User;
 };
 
 type AuthContextType = {
@@ -19,6 +24,10 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Initialize token from localStorage
+const TOKEN_KEY = "ranklens_auth_token";
+setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -30,9 +39,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const loginMutation = useMutation({
-    mutationFn: (data: any) => customFetch("/api/auth/login", { method: "POST", body: JSON.stringify(data) }),
-    onSuccess: (user: User) => {
-      queryClient.setQueryData(["/api/auth/me"], user);
+    mutationFn: (data: any) => customFetch<AuthResponse>("/api/auth/login", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: (resp: AuthResponse) => {
+      localStorage.setItem(TOKEN_KEY, resp.token);
+      queryClient.setQueryData(["/api/auth/me"], resp.user);
       toast({ title: "Welcome back!" });
     },
     onError: (err: any) => {
@@ -41,9 +51,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const registerMutation = useMutation({
-    mutationFn: (data: any) => customFetch("/api/auth/register", { method: "POST", body: JSON.stringify(data) }),
-    onSuccess: (user: User) => {
-      queryClient.setQueryData(["/api/auth/me"], user);
+    mutationFn: (data: any) => customFetch<AuthResponse>("/api/auth/register", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: (resp: AuthResponse) => {
+      localStorage.setItem(TOKEN_KEY, resp.token);
+      queryClient.setQueryData(["/api/auth/me"], resp.user);
       toast({ title: "Account created!" });
     },
     onError: (err: any) => {
@@ -54,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logoutMutation = useMutation({
     mutationFn: () => customFetch("/api/auth/logout", { method: "POST" }),
     onSuccess: () => {
+      localStorage.removeItem(TOKEN_KEY);
       queryClient.setQueryData(["/api/auth/me"], null);
       toast({ title: "Logged out" });
     },
