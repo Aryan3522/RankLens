@@ -1,10 +1,12 @@
 import { Router } from "express";
 import passport from "../lib/auth/passport.js";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { db, usersTable } from "../db/index.js";
 import { eq } from "drizzle-orm";
 
 const router = Router();
+const JWT_SECRET = process.env.SESSION_SECRET || "development-secret";
 
 router.post("/register", async (req, res) => {
   const { email, password, name } = req.body;
@@ -35,16 +37,16 @@ router.post("/register", async (req, res) => {
     
     const user = results[0];
 
-    // Log user in after registration
-    req.login(user, (err) => {
-      if (err) {
-        return res.status(500).json({ error: "Login failed after registration." });
-      }
-      return res.status(201).json({
+    // Generate JWT
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "30d" });
+
+    return res.status(201).json({
+      token,
+      user: {
         id: user.id,
         email: user.email,
         name: user.name,
-      });
+      },
     });
   } catch (err: any) {
     res.status(500).json({ error: "Internal server error." });
@@ -52,30 +54,32 @@ router.post("/register", async (req, res) => {
 });
 
 router.post("/login", (req, res, next) => {
-  passport.authenticate("local", (err: any, user: any, info: any) => {
+  passport.authenticate("local", { session: false }, (err: any, user: any, info: any) => {
     if (err) return next(err);
     if (!user) return res.status(401).json({ error: info.message || "Authentication failed." });
 
-    req.login(user, (err) => {
-      if (err) return next(err);
-      return res.json({
+    // Generate JWT
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "30d" });
+
+    return res.json({
+      token,
+      user: {
         id: user.id,
         email: user.email,
         name: user.name,
-      });
+      },
     });
   })(req, res, next);
 });
 
 router.post("/logout", (req, res) => {
-  req.logout((err) => {
-    if (err) return res.status(500).json({ error: "Logout failed." });
-    res.sendStatus(204);
-  });
+  // Stateless JWT logout is usually handled by client by deleting the token
+  res.sendStatus(204);
 });
 
 router.get("/me", (req, res) => {
-  if (!req.isAuthenticated()) {
+  // This will be handled by the updated isAuthenticated middleware which sets req.user
+  if (!req.user) {
     return res.status(401).json({ error: "Not authenticated." });
   }
   const user = req.user as any;
