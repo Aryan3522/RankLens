@@ -1,9 +1,20 @@
+import "dotenv/config";
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
 import { startCleanupTask } from "./lib/cleanup.js";
 
 const rawPort = process.env["PORT"] || "8080";
 const port = Number(rawPort);
+
+// --- Process Handlers ---
+process.on("unhandledRejection", (reason, promise) => {
+  logger.error({ promise, reason }, "Unhandled Rejection at Promise");
+});
+
+process.on("uncaughtException", (err) => {
+  logger.error({ err }, "Uncaught Exception thrown");
+  process.exit(1);
+});
 
 // Start auto-deletion cleanup task (3 days TTL)
 if (process.env.NODE_ENV !== "test") {
@@ -24,7 +35,11 @@ if (process.env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
       logger.error({ err }, "Error listening on port");
       process.exit(1);
     }
-    logger.info({ port }, "Server listening on 0.0.0.0");
+    logger.info({ 
+      port, 
+      env: process.env.NODE_ENV || "development",
+      nodeVersion: process.version 
+    }, "Server listening on 0.0.0.0");
   });
 }
 

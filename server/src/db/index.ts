@@ -5,12 +5,12 @@ import * as schema from "./schema/index.js";
 const { Pool } = pg;
 
 if (!process.env.DATABASE_URL) {
+  const errorMessage = "DATABASE_URL is missing. Please add your PostgreSQL connection string to your environment variables.";
   if (process.env.VERCEL === "1") {
-    console.error("DATABASE_URL is missing. Please add it to your Vercel Environment Variables.");
+    console.error(errorMessage);
   } else {
-    throw new Error(
-      "DATABASE_URL must be set. Did you forget to provision a database?",
-    );
+    console.warn("\x1b[33m%s\x1b[0m", "WARNING: " + errorMessage);
+    console.warn("The server will start, but database-dependent features will fail.");
   }
 }
 

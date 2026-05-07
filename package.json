@@ -6,6 +6,6 @@
     "server"
   ],
   "scripts": {
-    "build": "echo 'Building RankLens...'"
+    "build": "npm run build --workspaces --if-present"
   }
 }

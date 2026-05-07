@@ -28,8 +28,7 @@ router.get("/recommendations", isAuthenticated, async (req, res): Promise<void> 
       category: recommendationsTable.category,
       title: recommendationsTable.title,
       description: recommendationsTable.description,
-      action: recommendationsTable.action,
-      impact: recommendationsTable.impact,
+      impact: recommendationsTable.estimatedImpact,
       dismissed: recommendationsTable.dismissed,
       createdAt: recommendationsTable.createdAt,
     })

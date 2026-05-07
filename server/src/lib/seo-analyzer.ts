@@ -290,7 +290,7 @@ async function analyzeWebsite(url: string): Promise<SeoAnalysisResult> {
   const h1Tags = $("h1");
   const h1Count = h1Tags.length;
   const h1Texts: string[] = [];
-  h1Tags.each((_, el) => h1Texts.push($(el).text().trim()));
+  h1Tags.each((_, el) => { h1Texts.push($(el).text().trim()); });
   const h1Line = getLineNumber(html, "<h1");
 
   if (h1Count === 0) {
