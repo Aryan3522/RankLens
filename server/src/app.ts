@@ -13,9 +13,11 @@ const app: Express = express();
 app.set("trust proxy", 1);
 
 // --- Middleware Setup ---
-const clientUrl = (process.env.CLIENT_URL || "http://localhost:8081").replace(/\/$/, "");
+const clientUrls = (process.env.CLIENT_URL || "http://localhost:8081")
+  .split(",")
+  .map((url) => url.trim().replace(/\/$/, ""));
 
-logger.info({ allowedOrigin: clientUrl }, "CORS configuration");
+logger.info({ allowedOrigins: clientUrls }, "CORS configuration");
 
 // Logger first
 app.use(
@@ -39,10 +41,12 @@ app.use(
 );
 
 // CORS restricted to CLIENT_URL for security
-app.use(cors({ 
-  origin: clientUrl === "true" ? true : clientUrl, 
-  credentials: true 
-})); 
+app.use(
+  cors({
+    origin: clientUrls.length === 1 && clientUrls[0] === "true" ? true : clientUrls,
+    credentials: true,
+  }),
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
