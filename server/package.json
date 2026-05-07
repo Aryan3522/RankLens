@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --env-file .env src/index.ts",
+    "dev": "tsx watch --env-file .env.example src/index.ts",
     "build": "node ./build.mjs",
-    "start": "node --enable-source-maps ./dist/index.mjs",
+    "start": "node --enable-source-maps --env-file .env.example ./dist/index.mjs",
     "db:push": "npx drizzle-kit push",
     "typecheck": "tsc --noEmit"
   },

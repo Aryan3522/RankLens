@@ -4,11 +4,11 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, "../server", "VITE_");
+  const env = loadEnv(mode, ".", "VITE_");
 
   return {
     plugins: [react(), tailwindcss()],
-    envDir: "../server",
+    envDir: ".",
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
