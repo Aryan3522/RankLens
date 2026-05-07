@@ -1,7 +1,7 @@
 import { Router } from "express";
-import passport from "../lib/auth/passport";
+import passport from "../lib/auth/passport.js";
 import bcrypt from "bcrypt";
-import { db, usersTable } from "../db";
+import { db, usersTable } from "../db/index.js";
 import { eq } from "drizzle-orm";
 
 const router = Router();
