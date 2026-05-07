@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import { logger } from "./logger";
+import { logger } from "./logger.js";
 
 interface IssueDetail {
   category: string;
