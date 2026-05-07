@@ -54,29 +54,15 @@ app.use(
   cors({
     origin: clientUrls.length === 1 && clientUrls[0] === "true" ? true : clientUrls,
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   }),
 );
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- JWT Middleware ---
-app.use((req: Request, _res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    const token = authHeader.split(" ")[1];
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      req.user = decoded;
-    } catch (err) {
-      logger.debug({ err }, "Invalid JWT token");
-    }
-  }
-  next();
-});
-
 // --- Session & Auth Setup ---
-// Keeping sessions for legacy/fallback support if needed, but primary will be JWT
 if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
   logger.error("SESSION_SECRET is required in production!");
 }
@@ -103,6 +89,23 @@ app.use(
 
 app.use(passport.initialize());
 app.use(passport.session());
+
+// --- JWT Middleware (Run AFTER Passport to ensure it takes precedence) ---
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      // Explicitly set the user from JWT, even if session/passport didn't find one
+      req.user = decoded;
+      logger.debug({ userId: (decoded as any).id }, "JWT Token verified");
+    } catch (err) {
+      logger.warn({ err: (err as Error).message }, "Invalid JWT token provided");
+    }
+  }
+  next();
+});
 
 // --- Rate Limiting ---
 const apiLimiter = rateLimit({
