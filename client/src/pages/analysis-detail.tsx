@@ -88,7 +88,10 @@ function IssueCard({ issue }: { issue: SeoIssue }) {
           </div>
           <p className="text-sm text-muted-foreground leading-relaxed">{issue.description}</p>
           {issue.affectedUrl && !issue.affectedUrl.startsWith("<!") && (
-            <p className="text-xs text-muted-foreground/60 mt-1 font-mono truncate">{issue.affectedUrl}</p>
+            <div className="mt-2 flex items-center gap-1.5 overflow-hidden">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 bg-muted px-1.5 py-0.5 rounded shrink-0">Page</span>
+              <p className="text-xs text-primary/70 font-mono truncate hover:text-primary transition-colors">{issue.affectedUrl}</p>
+            </div>
           )}
         </div>
         {hasDetails && (
@@ -270,6 +273,10 @@ export default function AnalysisDetail({ id }: { id: number }) {
 
   const issues = (analysis.issues ?? []) as SeoIssue[];
   const recommendations = (analysis.recommendations ?? []) as Recommendation[];
+  
+  // Derive page count from unique affected URLs
+  const pageCount = new Set(issues.map(i => i.affectedUrl).filter(Boolean)).size || 1;
+
   const criticalCount = issues.filter(i => i.severity === "critical").length;
   const warningCount = issues.filter(i => i.severity === "warning").length;
   const infoCount = issues.filter(i => i.severity === "info").length;
@@ -403,6 +410,7 @@ export default function AnalysisDetail({ id }: { id: number }) {
             <div className="space-y-2.5">
               {([
                 ["Word Count", analysis.wordCount?.toLocaleString()],
+                ["Pages Analyzed", pageCount],
                 ["Internal Links", analysis.internalLinks],
                 ["External Links", analysis.externalLinks],
                 ["H1 Tags", analysis.h1Count],

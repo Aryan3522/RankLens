@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, boolean, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { analysesTable } from "./analyses.js";
@@ -13,7 +13,9 @@ export const recommendationsTable = pgTable("recommendations", {
   estimatedImpact: integer("estimated_impact").notNull().default(0),
   dismissed: boolean("dismissed").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  analysisIdIdx: index("recommendations_analysis_id_idx").on(table.analysisId),
+}));
 
 export const insertRecommendationSchema = createInsertSchema(recommendationsTable).omit({ id: true, createdAt: true });
 export type InsertRecommendation = z.infer<typeof insertRecommendationSchema>;

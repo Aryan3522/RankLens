@@ -41,6 +41,7 @@ build/Release
 # Dependency directories
 node_modules/
 jspm_packages/
+.pnpm-store/
 
 # Snowpack dependency directory (https://www.snowpack.dev/)
 web_modules/
@@ -105,3 +106,9 @@ out/
 
 # Vite
 *.wasm
+
+# Knowledge Graphs
+graphify-out/
+
+# Gemini CLI / Agent Context
+.gemini/
