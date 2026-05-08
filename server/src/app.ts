@@ -23,7 +23,7 @@ app.use(compression()); // Compresses response bodies
 app.set("trust proxy", 1); // Required for Vercel/Render behind a proxy
 
 // --- Middleware Setup ---
-const clientUrls = env.CLIENT_URL
+const clientUrls = (env.CLIENT_URL || "http://localhost:8081")
   .split(",")
   .map((url) => url.trim().replace(/\/$/, ""));
 
@@ -68,6 +68,8 @@ if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
   logger.error("SESSION_SECRET is required in production!");
 }
 
+const isProd = env.NODE_ENV === "production";
+
 app.use(
   session({
     store: new PostgresStore({
@@ -79,11 +81,13 @@ app.use(
     resave: false,
     saveUninitialized: false,
     proxy: true,
+    name: "ranklens.sid",
     cookie: {
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days for permanent login
       httpOnly: true,
-      secure: env.NODE_ENV === "production",
-      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+      secure: isProd, // Requires HTTPS in production
+      sameSite: isProd ? "none" : "lax", // 'none' is required for cross-origin cookies
+      path: "/",
     },
   })
 );
