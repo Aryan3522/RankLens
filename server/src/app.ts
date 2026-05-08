@@ -59,33 +59,19 @@ app.use(
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
 
-      // If no CLIENT_URL is set in production, this is a configuration error
-      // but we allow it for debugging if the user is struggling.
-      if (clientUrls.length === 0) {
-        return callback(null, true);
-      }
-
-      const isAllowed = clientUrls.some((url) => {
-        if (url === "*" || url === "true") return true;
-        // Exact match
-        if (url === origin) return true;
-        // Handle Vercel preview URLs more safely
-        if (origin.endsWith(".vercel.app")) return true;
-        return false;
-      });
-
-      if (isAllowed) {
+      // If the origin matches any of the clientUrls, allow it
+      if (clientUrls.includes(origin)) {
         callback(null, true);
       } else {
         logger.warn({ origin, allowed: clientUrls }, "CORS blocked origin");
-        // Instead of erroring out (which can cause failed to fetch), 
-        // we return false so the CORS middleware sends a standard 403 or similar
-        callback(null, false);
+        // For production strictness, we callback with an error or null, false
+        callback(new Error("Not allowed by CORS"));
       }
     },
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization", "Accept"],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    optionsSuccessStatus: 200, // Some legacy browsers choke on 204
   }),
 );
 
