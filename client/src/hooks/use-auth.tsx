@@ -11,6 +11,7 @@ type User = {
 
 type AuthResponse = {
   user: User;
+  token: string;
 };
 
 type AuthContextType = {
@@ -22,6 +23,9 @@ type AuthContextType = {
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+// Register token getter globally
+setAuthTokenGetter(() => localStorage.getItem("ranklens_token"));
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
@@ -36,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: (data: any) => customFetch<AuthResponse>("/api/auth/login", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: (resp: AuthResponse) => {
+      localStorage.setItem("ranklens_token", resp.token);
       queryClient.setQueryData(["/api/auth/me"], resp.user);
       toast({ title: "Welcome back!" });
     },
@@ -47,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const registerMutation = useMutation({
     mutationFn: (data: any) => customFetch<AuthResponse>("/api/auth/register", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: (resp: AuthResponse) => {
+      localStorage.setItem("ranklens_token", resp.token);
       queryClient.setQueryData(["/api/auth/me"], resp.user);
       toast({ title: "Account created!" });
     },
@@ -58,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logoutMutation = useMutation({
     mutationFn: () => customFetch("/api/auth/logout", { method: "POST" }),
     onSuccess: () => {
+      localStorage.removeItem("ranklens_token");
       queryClient.setQueryData(["/api/auth/me"], null);
       toast({ title: "Logged out" });
     },

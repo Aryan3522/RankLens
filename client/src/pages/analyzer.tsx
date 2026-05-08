@@ -3,6 +3,7 @@ import {
   useCreateAnalysis, useListAnalyses, useListProjects,
   getListAnalysesQueryKey,
 } from "@/api";
+import { customFetch } from "@/api/custom-fetch";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
@@ -77,7 +78,7 @@ export default function Analyzer() {
     setDeleting(id);
     setConfirmDelete(null);
     try {
-      await fetch(`/api/analyses/${id}`, { method: "DELETE" });
+      await customFetch(`/api/analyses/${id}`, { method: "DELETE" });
       queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
       toast({ title: "Deleted", description: "Analysis removed." });
     } catch {

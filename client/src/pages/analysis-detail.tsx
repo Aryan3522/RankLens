@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useGetAnalysis, getGetAnalysisQueryKey, useRerunAnalysis, getListAnalysesQueryKey } from "@/api";
+import { customFetch } from "@/api/custom-fetch";
 import { Link, useLocation } from "wouter";
 import {
   ArrowLeft, RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle, Info,
@@ -224,7 +225,7 @@ export default function AnalysisDetail({ id }: { id: number }) {
     }
     setDeleting(true);
     try {
-      await fetch(`/api/analyses/${id}`, { method: "DELETE" });
+      await customFetch(`/api/analyses/${id}`, { method: "DELETE" });
       queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
       toast({ title: "Analysis deleted" });
       navigate("/analyzer");
