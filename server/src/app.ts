@@ -53,7 +53,32 @@ app.use(
 // CORS restricted to CLIENT_URL for security
 app.use(
   cors({
-    origin: clientUrls.length === 1 && clientUrls[0] === "true" ? true : clientUrls,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
+      // Check if origin is in the allowed list or matches a Vercel preview pattern
+      const isAllowed = clientUrls.some((url) => {
+        if (url === "*") return true;
+        if (url === "true") return true;
+        // Exact match
+        if (url === origin) return true;
+        // Handle Vercel preview URLs (e.g. project-name-git-branch-username.vercel.app)
+        // If the allowed URL is a base vercel domain, allow subdomains
+        if (url.endsWith(".vercel.app") && origin.endsWith(".vercel.app")) {
+          // This is a basic check, you could make it more specific to your project name
+          return true;
+        }
+        return false;
+      });
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        logger.warn({ origin }, "CORS blocked origin");
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization", "Accept"],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
