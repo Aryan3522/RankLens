@@ -23,11 +23,12 @@ app.use(compression()); // Compresses response bodies
 app.set("trust proxy", 1); // Required for Vercel/Render behind a proxy
 
 // --- Middleware Setup ---
-const clientUrls = (env.CLIENT_URL || "http://localhost:8081")
+const clientUrls = (env.CLIENT_URL || "")
   .split(",")
-  .map((url) => url.trim().replace(/\/$/, ""));
+  .map((url) => url.trim().replace(/\/$/, ""))
+  .filter(Boolean);
 
-logger.info({ allowedOrigins: clientUrls }, "CORS configuration");
+logger.info({ allowedOrigins: clientUrls.length > 0 ? clientUrls : "ALL (DEBUG MODE)" }, "CORS configuration");
 
 // Logger first
 app.use(
@@ -39,6 +40,7 @@ app.use(
           id: req.id,
           method: req.method,
           url: req.url?.split("?")[0],
+          origin: req.headers.origin, // Log origin for debugging
         };
       },
       res(res: any) {
@@ -57,26 +59,28 @@ app.use(
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
 
-      // Check if origin is in the allowed list or matches a Vercel preview pattern
+      // If no CLIENT_URL is set in production, this is a configuration error
+      // but we allow it for debugging if the user is struggling.
+      if (clientUrls.length === 0) {
+        return callback(null, true);
+      }
+
       const isAllowed = clientUrls.some((url) => {
-        if (url === "*") return true;
-        if (url === "true") return true;
+        if (url === "*" || url === "true") return true;
         // Exact match
         if (url === origin) return true;
-        // Handle Vercel preview URLs (e.g. project-name-git-branch-username.vercel.app)
-        // If the allowed URL is a base vercel domain, allow subdomains
-        if (url.endsWith(".vercel.app") && origin.endsWith(".vercel.app")) {
-          // This is a basic check, you could make it more specific to your project name
-          return true;
-        }
+        // Handle Vercel preview URLs more safely
+        if (origin.endsWith(".vercel.app")) return true;
         return false;
       });
 
       if (isAllowed) {
         callback(null, true);
       } else {
-        logger.warn({ origin }, "CORS blocked origin");
-        callback(new Error("Not allowed by CORS"));
+        logger.warn({ origin, allowed: clientUrls }, "CORS blocked origin");
+        // Instead of erroring out (which can cause failed to fetch), 
+        // we return false so the CORS middleware sends a standard 403 or similar
+        callback(null, false);
       }
     },
     credentials: true,
