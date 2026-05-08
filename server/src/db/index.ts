@@ -26,6 +26,12 @@ export const pool = new Pool({
   idleTimeoutMillis: 30000,
   max: 20, // Max concurrent connections
 });
+
+// Add error listener to prevent 500 crashes during idle/unexpected DB errors
+pool.on("error", (err) => {
+  console.error("❌ PostgreSQL Pool Error:", err);
+});
+
 export const db = drizzle(pool, { schema });
 
 export * from "@/db/schema/index.js";

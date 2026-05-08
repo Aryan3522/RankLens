@@ -1,5 +1,4 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
-import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import { pinoHttp } from "pino-http";
@@ -14,31 +13,32 @@ import { pool } from "@/db/index.js";
 import { env } from "@/lib/env.js";
 
 const app: Express = express();
-const PostgresStore = connectPgSimple(session);
 
-// --- 1. CORS AT THE ABSOLUTE TOP ---
+// --- 1. MANUAL CORS HEADERS (ABSOLUTE TOP) ---
 const clientUrls = (env.CLIENT_URL || "")
   .split(",")
-  .map((url) => url.trim().replace(/\/$/, ""))
+  .map((url: string) => url.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
 const allowedOrigins = [...new Set([...clientUrls, "https://rank-lens-delta.vercel.app"])];
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(null, false);
-      }
-    },
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    optionsSuccessStatus: 200,
-  }),
-);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
+  }
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+  next();
+});
+
+const PostgresStore = connectPgSimple(session);
 
 // --- 2. Security & Performance ---
 app.use(helmet()); 
@@ -62,6 +62,16 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// --- 4. Health Check (No DB dependency) ---
+app.get("/api/health", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    env: env.NODE_ENV,
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString()
+  });
+});
 
 // --- Session & Auth Setup ---
 if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
