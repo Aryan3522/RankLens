@@ -19,9 +19,8 @@ function validateEnv() {
       console.error(`   - ${err.path.join(".")}: ${err.message}`);
     });
     
-    // Do NOT exit the process, let the app try to run
-    // Return the partial data or the raw process.env to avoid crashing
-    return { ...process.env, ...parsed.data } as any;
+    // Fallback to process.env as any to prevent crashing
+    return process.env as any;
   }
 
   return parsed.data;

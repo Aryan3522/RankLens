@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { env } from "@/lib/env.js";
 import { db, usersTable } from "@/db/index.js";
 import { eq } from "drizzle-orm";
+import { logger } from "@/lib/logger.js";
 
 export async function isAuthenticated(req: Request, res: Response, next: NextFunction) {
   try {
