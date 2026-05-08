@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 
 export default function AuthPage() {
   const { user, login, register, isLoading } = useAuth();
@@ -50,7 +50,15 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-muted/40 p-4">
+      <div className="w-full max-w-md mb-4">
+        <Link href="/">
+          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="w-4 h-4" />
+            Back to Home
+          </Button>
+        </Link>
+      </div>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Welcome to RankLens</CardTitle>

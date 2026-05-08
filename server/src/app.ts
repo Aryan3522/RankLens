@@ -11,10 +11,11 @@ import jwt from "jsonwebtoken";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { pool } from "./db/index.js";
+import { env } from "./lib/env.js";
 
 const app: Express = express();
 const PostgresStore = connectPgSimple(session);
-const JWT_SECRET = process.env.SESSION_SECRET || "development-secret";
+const JWT_SECRET = env.JWT_SECRET;
 
 // --- Security & Performance ---
 app.use(helmet()); // Sets various security headers
@@ -22,7 +23,7 @@ app.use(compression()); // Compresses response bodies
 app.set("trust proxy", 1); // Required for Vercel/Render behind a proxy
 
 // --- Middleware Setup ---
-const clientUrls = (process.env.CLIENT_URL || "http://localhost:8081")
+const clientUrls = env.CLIENT_URL
   .split(",")
   .map((url) => url.trim().replace(/\/$/, ""));
 
@@ -74,38 +75,21 @@ app.use(
       tableName: "session",
       createTableIfMissing: true,
     }),
-    secret: process.env.SESSION_SECRET || "development-secret",
+    secret: env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     proxy: true,
     cookie: {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      secure: env.NODE_ENV === "production",
+      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
     },
   })
 );
 
 app.use(passport.initialize());
 app.use(passport.session());
-
-// --- JWT Middleware (Run AFTER Passport to ensure it takes precedence) ---
-app.use((req: Request, _res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    const token = authHeader.split(" ")[1];
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      // Explicitly set the user from JWT, even if session/passport didn't find one
-      req.user = decoded;
-      logger.debug({ userId: (decoded as any).id }, "JWT Token verified");
-    } catch (err) {
-      logger.warn({ err: (err as Error).message }, "Invalid JWT token provided");
-    }
-  }
-  next();
-});
 
 // --- Rate Limiting ---
 const apiLimiter = rateLimit({

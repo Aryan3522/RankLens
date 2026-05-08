@@ -15,7 +15,16 @@ if (!process.env.DATABASE_URL) {
 }
 
 export const pool = new Pool({ 
-  connectionString: process.env.DATABASE_URL || "postgres://dummy:dummy@localhost:5432/dummy" 
+  connectionString: process.env.DATABASE_URL || "postgres://dummy:dummy@localhost:5432/dummy",
+  ssl: process.env.DATABASE_URL?.includes("neon.tech") || 
+       process.env.DATABASE_URL?.includes("render.com") || 
+       process.env.DATABASE_URL?.includes("supabase") || 
+       process.env.DATABASE_URL?.includes("neondb")
+    ? { rejectUnauthorized: false }
+    : false,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  max: 20, // Max concurrent connections
 });
 export const db = drizzle(pool, { schema });
 

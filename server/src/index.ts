@@ -1,10 +1,10 @@
 import "dotenv/config";
+import { env } from "./lib/env.js";
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
 import { startCleanupTask } from "./lib/cleanup.js";
 
-const rawPort = process.env["PORT"] || "8080";
-const port = Number(rawPort);
+const port = env.PORT;
 
 // --- Process Handlers ---
 process.on("unhandledRejection", (reason, promise) => {
@@ -17,17 +17,13 @@ process.on("uncaughtException", (err) => {
 });
 
 // Start auto-deletion cleanup task (3 days TTL)
-if (process.env.NODE_ENV !== "test") {
+if (env.NODE_ENV !== "test") {
   startCleanupTask();
 }
 
-if (process.env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
-  if (!process.env["PORT"]) {
-    logger.warn("PORT environment variable not provided, defaulting to 8080");
-  }
-
+if (env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
   if (Number.isNaN(port) || port <= 0) {
-    throw new Error(`Invalid PORT value: "${rawPort}"`);
+    throw new Error(`Invalid PORT value: "${port}"`);
   }
 
   app.listen(port, "0.0.0.0", (err?: Error | null) => {
@@ -37,7 +33,7 @@ if (process.env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
     }
     logger.info({ 
       port, 
-      env: process.env.NODE_ENV || "development",
+      env: env.NODE_ENV || "development",
       nodeVersion: process.version 
     }, "Server listening on 0.0.0.0");
   });
