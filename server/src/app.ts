@@ -5,13 +5,13 @@ import compression from "compression";
 import { pinoHttp } from "pino-http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import passport from "./lib/auth/passport.js";
+import passport from "@/lib/auth/passport.js";
 import { rateLimit } from "express-rate-limit";
 import jwt from "jsonwebtoken";
-import router from "./routes/index.js";
-import { logger } from "./lib/logger.js";
-import { pool } from "./db/index.js";
-import { env } from "./lib/env.js";
+import router from "@/routes/index.js";
+import { logger } from "@/lib/logger.js";
+import { pool } from "@/db/index.js";
+import { env } from "@/lib/env.js";
 
 const app: Express = express();
 const PostgresStore = connectPgSimple(session);

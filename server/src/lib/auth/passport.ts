@@ -1,7 +1,7 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcrypt from "bcrypt";
-import { db, usersTable } from "../../db/index.js";
+import { db, usersTable } from "@/db/index.js";
 import { eq } from "drizzle-orm";
 
 passport.use(

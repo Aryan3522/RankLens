@@ -1,14 +1,14 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, analysesTable, seoIssuesTable, recommendationsTable } from "../db/index.js";
+import { db, analysesTable, seoIssuesTable, recommendationsTable } from "@/db/index.js";
 import {
   CreateAnalysisBody,
   GetAnalysisParams,
   ListAnalysesQueryParams,
   RerunAnalysisParams,
-} from "../types/generated/api.js";
-import { generateSeoAnalysis } from "../lib/seo-analyzer.js";
-import { isAuthenticated } from "../middlewares/auth.js";
+} from "@/types/generated/api.js";
+import { generateSeoAnalysis } from "@/lib/seo-analyzer.js";
+import { isAuthenticated } from "@/middlewares/auth.js";
 
 const router: IRouter = Router();
 

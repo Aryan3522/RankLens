@@ -1,8 +1,8 @@
 import "dotenv/config";
-import { env } from "./lib/env.js";
-import app from "./app.js";
-import { logger } from "./lib/logger.js";
-import { startCleanupTask } from "./lib/cleanup.js";
+import { env } from "@/lib/env.js";
+import app from "@/app.js";
+import { logger } from "@/lib/logger.js";
+import { startCleanupTask } from "@/lib/cleanup.js";
 
 const port = env.PORT;
 

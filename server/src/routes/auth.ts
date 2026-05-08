@@ -1,8 +1,11 @@
 import { Router } from "express";
-import passport from "../lib/auth/passport.js";
+import passport from "@/lib/auth/passport.js";
 import bcrypt from "bcrypt";
-import { db, usersTable } from "../db/index.js";
+import jwt from "jsonwebtoken";
+import { db, usersTable } from "@/db/index.js";
 import { eq } from "drizzle-orm";
+import { env } from "@/lib/env.js";
+import { isAuthenticated } from "@/middlewares/auth.js";
 
 const router = Router();
 
@@ -37,10 +40,13 @@ router.post("/register", async (req, res, next) => {
     
     const user = results[0];
 
-    // Establish session
+    const token = jwt.sign({ id: user.id }, env.JWT_SECRET, { expiresIn: "30d" });
+
+    // Establish session (keep for backward compatibility if needed)
     req.login(user, (err) => {
       if (err) return next(err);
       return res.status(201).json({
+        token,
         user: {
           id: user.id,
           email: user.email,
@@ -61,7 +67,10 @@ router.post("/login", (req, res, next) => {
     req.login(user, (loginErr) => {
       if (loginErr) return next(loginErr);
       
+      const token = jwt.sign({ id: user.id }, env.JWT_SECRET, { expiresIn: "30d" });
+
       return res.json({
+        token,
         user: {
           id: user.id,
           email: user.email,
@@ -77,17 +86,13 @@ router.post("/logout", (req, res, next) => {
     if (err) return next(err);
     req.session.destroy((destroyErr) => {
       if (destroyErr) return next(destroyErr);
-      res.clearCookie("connect.sid"); // Clear the session cookie
+      res.clearCookie("ranklens.sid"); // Clear the session cookie
       res.sendStatus(204);
     });
   });
 });
 
-router.get("/me", (req, res) => {
-  // This will be handled by the updated isAuthenticated middleware which sets req.user
-  if (!req.user) {
-    return res.status(401).json({ error: "Not authenticated." });
-  }
+router.get("/me", isAuthenticated, (req, res) => {
   const user = req.user as any;
   res.json({
     id: user.id,
