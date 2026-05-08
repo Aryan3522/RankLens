@@ -15,67 +15,48 @@ import { env } from "@/lib/env.js";
 
 const app: Express = express();
 const PostgresStore = connectPgSimple(session);
-const JWT_SECRET = env.JWT_SECRET;
 
-// --- Security & Performance ---
-app.use(helmet()); // Sets various security headers
-app.use(compression()); // Compresses response bodies
-app.set("trust proxy", 1); // Required for Vercel/Render behind a proxy
-
-// --- Middleware Setup ---
+// --- 1. CORS AT THE ABSOLUTE TOP ---
 const clientUrls = (env.CLIENT_URL || "")
   .split(",")
   .map((url) => url.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
-// Always allow the specific production URL as a safety fallback
 const allowedOrigins = [...new Set([...clientUrls, "https://rank-lens-delta.vercel.app"])];
 
-logger.info({ allowedOrigins }, "CORS configuration");
-
-// Logger first
-app.use(
-  pinoHttp({
-    logger,
-    serializers: {
-      req(req: any) {
-        return {
-          id: req.id,
-          method: req.method,
-          url: req.url?.split("?")[0],
-          origin: req.headers.origin, // Log origin for debugging
-        };
-      },
-      res(res: any) {
-        return {
-          statusCode: res.statusCode,
-        };
-      },
-    },
-  }),
-);
-
-// CORS restricted to CLIENT_URL for security
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-
-      // If the origin matches any of the allowedOrigins, allow it
-      if (allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        logger.warn({ origin, allowed: allowedOrigins }, "CORS blocked origin");
-        // Returning null, false instead of an Error prevents Express from 500ing
-        // This ensures the browser receives a clean CORS rejection instead of a server crash.
         callback(null, false);
       }
     },
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization", "Accept"],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    optionsSuccessStatus: 200, // Some legacy browsers choke on 204
+    optionsSuccessStatus: 200,
+  }),
+);
+
+// --- 2. Security & Performance ---
+app.use(helmet()); 
+app.use(compression());
+app.set("trust proxy", 1); 
+
+// --- 3. Logging & Parsers ---
+app.use(
+  pinoHttp({
+    logger,
+    serializers: {
+      req: (req: any) => ({
+        id: req.id,
+        method: req.method,
+        url: req.url?.split("?")[0],
+        origin: req.headers.origin,
+      }),
+    },
   }),
 );
 
@@ -130,15 +111,28 @@ const apiLimiter = rateLimit({
 // Apply rate limiter and routes
 app.use("/api", apiLimiter, router);
 
+// Ping for debugging
+app.get("/api/ping", (req, res) => {
+  res.json({ pong: true, origin: req.headers.origin, allowed: allowedOrigins });
+});
+
 // --- Global Error Handler ---
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";
   
   logger.error({ err, status, message }, "Unhandled Application Error");
   
+  // MANUALLY set CORS headers for error responses
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+  
   res.status(status).json({
     error: process.env.NODE_ENV === "production" ? "Internal Server Error" : message,
+    debug: process.env.NODE_ENV === "production" ? undefined : err.stack,
   });
 });
 
