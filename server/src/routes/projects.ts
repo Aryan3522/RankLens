@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import { eq, count, max, and } from "drizzle-orm";
-import { db, projectsTable, analysesTable } from "@/db/index.js";
-import { CreateProjectBody, GetProjectParams, DeleteProjectParams } from "@/types/generated/api.js";
-import { isAuthenticated } from "@/middlewares/auth.js";
+import { db, projectsTable, analysesTable } from "../db/index.js";
+import { CreateProjectBody, GetProjectParams, DeleteProjectParams } from "../types/generated/api.js";
+import { isAuthenticated } from "../middlewares/auth.js";
 
 const router: IRouter = Router();
 

@@ -1,7 +1,7 @@
 import { pgTable, text, serial, timestamp, integer, boolean, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { analysesTable } from "@/db/schema/analyses.js";
+import { analysesTable } from "./analyses.js";
 
 export const recommendationsTable = pgTable("recommendations", {
   id: serial("id").primaryKey(),

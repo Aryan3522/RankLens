@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, keywordsTable, keywordRankHistoryTable } from "@/db/index.js";
-import { CreateKeywordBody, ListKeywordsQueryParams, DeleteKeywordParams, GetKeywordHistoryParams } from "@/types/generated/api.js";
-import { isAuthenticated } from "@/middlewares/auth.js";
+import { db, keywordsTable, keywordRankHistoryTable } from "../db/index.js";
+import { CreateKeywordBody, ListKeywordsQueryParams, DeleteKeywordParams, GetKeywordHistoryParams } from "../types/generated/api.js";
+import { isAuthenticated } from "../middlewares/auth.js";
 
 const router: IRouter = Router();
 

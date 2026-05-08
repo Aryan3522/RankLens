@@ -1,11 +1,11 @@
 import { Router } from "express";
-import passport from "@/lib/auth/passport.js";
+import passport from "../lib/auth/passport.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { db, usersTable } from "@/db/index.js";
+import { db, usersTable } from "../db/index.js";
 import { eq } from "drizzle-orm";
-import { env } from "@/lib/env.js";
-import { isAuthenticated } from "@/middlewares/auth.js";
+import { env } from "../lib/env.js";
+import { isAuthenticated } from "../middlewares/auth.js";
 
 const router = Router();
 
