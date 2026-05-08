@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import { eq, count, avg, and, desc } from "drizzle-orm";
-import { db, projectsTable, analysesTable, keywordsTable, recommendationsTable, seoIssuesTable } from "@/db/index.js";
-import { GetScoreTrendQueryParams } from "@/types/generated/api.js";
-import { isAuthenticated } from "@/middlewares/auth.js";
+import { db, projectsTable, analysesTable, keywordsTable, recommendationsTable, seoIssuesTable } from "../db/index.js";
+import { GetScoreTrendQueryParams } from "../types/generated/api.js";
+import { isAuthenticated } from "../middlewares/auth.js";
 
 const router: IRouter = Router();
 

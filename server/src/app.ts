@@ -1,20 +1,21 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
+import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import { pinoHttp } from "pino-http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import passport from "@/lib/auth/passport.js";
+import passport from "./lib/auth/passport.js";
 import { rateLimit } from "express-rate-limit";
 import jwt from "jsonwebtoken";
-import router from "@/routes/index.js";
-import { logger } from "@/lib/logger.js";
-import { pool } from "@/db/index.js";
-import { env } from "@/lib/env.js";
+import router from "./routes/index.js";
+import { logger } from "./lib/logger.js";
+import { pool } from "./db/index.js";
+import { env } from "./lib/env.js";
 
 const app: Express = express();
 
-// --- 1. MANUAL CORS HEADERS (ABSOLUTE TOP) ---
+// --- 1. CORS (ABSOLUTE TOP) ---
 const clientUrls = (env.CLIENT_URL || "")
   .split(",")
   .map((url: string) => url.trim().replace(/\/$/, ""))
@@ -22,21 +23,22 @@ const clientUrls = (env.CLIENT_URL || "")
 
 const allowedOrigins = [...new Set([...clientUrls, "https://rank-lens-delta.vercel.app"])];
 
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization");
-  }
-
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-  next();
-});
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        logger.warn({ origin, allowed: allowedOrigins }, "CORS blocked origin");
+        callback(null, false);
+      }
+    },
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With", "X-CSRF-Token"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    optionsSuccessStatus: 200,
+  }),
+);
 
 const PostgresStore = connectPgSimple(session);
 
@@ -133,7 +135,7 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   
   logger.error({ err, status, message }, "Unhandled Application Error");
   
-  // MANUALLY set CORS headers for error responses
+  // MANUALLY set CORS headers for error responses as a final fail-safe
   const origin = req.headers.origin;
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);

@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, recommendationsTable, analysesTable } from "@/db/index.js";
-import { ListRecommendationsQueryParams, DismissRecommendationParams } from "@/types/generated/api.js";
-import { isAuthenticated } from "@/middlewares/auth.js";
+import { db, recommendationsTable, analysesTable } from "../db/index.js";
+import { ListRecommendationsQueryParams, DismissRecommendationParams } from "../types/generated/api.js";
+import { isAuthenticated } from "../middlewares/auth.js";
 
 const router: IRouter = Router();
 

@@ -1,6 +1,6 @@
-import { db, analysesTable, projectsTable } from "@/db/index.js";
+import { db, analysesTable, projectsTable } from "../db/index.js";
 import { eq, lt } from "drizzle-orm";
-import { logger } from "@/lib/logger.js";
+import { logger } from "./logger.js";
 
 
 export function startCleanupTask() {
