@@ -28,7 +28,10 @@ const clientUrls = (env.CLIENT_URL || "")
   .map((url) => url.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
-logger.info({ allowedOrigins: clientUrls.length > 0 ? clientUrls : "ALL (DEBUG MODE)" }, "CORS configuration");
+// Always allow the specific production URL as a safety fallback
+const allowedOrigins = [...new Set([...clientUrls, "https://rank-lens-delta.vercel.app"])];
+
+logger.info({ allowedOrigins }, "CORS configuration");
 
 // Logger first
 app.use(
@@ -59,13 +62,14 @@ app.use(
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
 
-      // If the origin matches any of the clientUrls, allow it
-      if (clientUrls.includes(origin)) {
+      // If the origin matches any of the allowedOrigins, allow it
+      if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        logger.warn({ origin, allowed: clientUrls }, "CORS blocked origin");
-        // For production strictness, we callback with an error or null, false
-        callback(new Error("Not allowed by CORS"));
+        logger.warn({ origin, allowed: allowedOrigins }, "CORS blocked origin");
+        // Returning null, false instead of an Error prevents Express from 500ing
+        // This ensures the browser receives a clean CORS rejection instead of a server crash.
+        callback(null, false);
       }
     },
     credentials: true,
