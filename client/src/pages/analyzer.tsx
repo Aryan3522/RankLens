@@ -29,6 +29,7 @@ function StatusIcon({ status }: { status: string }) {
   if (status === "completed") return <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />;
   if (status === "failed")    return <XCircle    className="w-4 h-4 text-red-500 shrink-0" />;
   if (status === "running")   return <RefreshCw  className="w-4 h-4 text-blue-500 animate-spin shrink-0" />;
+  if (status === "queued")    return <Clock      className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />;
   return <Clock className="w-4 h-4 text-amber-500 shrink-0" />;
 }
 
@@ -53,13 +54,26 @@ export default function Analyzer() {
     createAnalysis.mutate(
       { data: { url: url.trim(), type, projectId: projectId && projectId !== "none" ? Number(projectId) : null } },
       {
-        onSuccess: (data) => {
+        onSuccess: (data: any) => {
           queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
           setUrl("");
-          toast({ title: "Analysis started", description: `Analyzing ${data.url}` });
+          const msg = data.queuePosition > 0 
+            ? `Analyzing ${data.url} (Position in queue: ${data.queuePosition})`
+            : `Analyzing ${data.url}`;
+          toast({ title: "Analysis started", description: msg });
           setTimeout(() => queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() }), 2000);
         },
-        onError: () => toast({ title: "Error", description: "Failed to start analysis", variant: "destructive" }),
+        onError: (err: any) => {
+          if (err.status === 429) {
+            toast({ 
+              title: "Rate Limited", 
+              description: err.data?.error || "Too many requests. Please try again later.", 
+              variant: "destructive" 
+            });
+          } else {
+            toast({ title: "Error", description: "Failed to start analysis", variant: "destructive" });
+          }
+        },
       }
     );
   };
@@ -185,6 +199,7 @@ export default function Analyzer() {
                       <p className="text-sm font-medium text-foreground truncate">{an.url}</p>
                       <p className="text-xs text-muted-foreground capitalize">
                         {an.type} · {new Date(an.createdAt).toLocaleString()}
+                        {an.status === "queued" && <span className="ml-2 text-amber-600 font-bold animate-pulse">In Queue</span>}
                       </p>
                     </div>
                     {an.seoScore != null && (
