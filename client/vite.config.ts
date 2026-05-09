@@ -19,6 +19,23 @@ export default defineConfig(({ mode }) => {
         "@assets": path.resolve(__dirname, "./attached_assets"),
       },
     },
+    build: {
+      target: "esnext",
+      minify: "esbuild",
+      cssMinify: true,
+      sourcemap: false,
+      chunkSizeWarningLimit: 600,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            "vendor-react": ["react", "react-dom", "wouter"],
+            "vendor-ui": ["lucide-react", "@radix-ui/react-slot", "class-variance-authority", "clsx", "tailwind-merge"],
+            "vendor-charts": ["recharts"],
+            "vendor-query": ["@tanstack/react-query"],
+          },
+        },
+      },
+    },
     server: {
       port: 8081,
       proxy: {

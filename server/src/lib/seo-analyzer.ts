@@ -34,6 +34,7 @@ interface SeoAnalysisResult {
   imagesMissingAlt: number;
   pageLoadScore: number;
   mobileScore: number;
+  pageCount: number;
   issues: IssueDetail[];
   recommendations: RecommendationDetail[];
 }
@@ -75,7 +76,120 @@ export async function generateSeoAnalysis(url: string, type: string): Promise<Se
   return analyzeInstagram(url);
 }
 
-async function analyzeWebsite(url: string): Promise<SeoAnalysisResult> {
+async function analyzeWebsite(rootUrl: string): Promise<SeoAnalysisResult> {
+  const maxPages = 20; // Limit for performance
+  const concurrency = 3; // Number of concurrent page analyses
+  const pagesToCrawl = [rootUrl];
+  const crawledPages = new Set<string>();
+  const allResults: SeoAnalysisResult[] = [];
+  
+  let rootDomain = "";
+  try { rootDomain = new URL(rootUrl).hostname; } catch { rootDomain = ""; }
+
+  // Simple concurrency-controlled worker
+  const processNextPage = async () => {
+    while (pagesToCrawl.length > 0 && crawledPages.size < maxPages) {
+      const url = pagesToCrawl.shift();
+      if (!url || crawledPages.has(url)) continue;
+      
+      crawledPages.add(url);
+      logger.debug({ url, count: crawledPages.size }, "Crawling page");
+      
+      const result = await analyzePage(url);
+      allResults.push(result);
+
+      // If it's a critical fetch error on the first page, we stop early
+      if (crawledPages.size === 1 && result.seoScore === 0 && result.issues.some(i => i.title === "Page could not be fetched")) {
+        return;
+      }
+
+      // Discover new internal links
+      const fetched = await fetchPage(url);
+      if (fetched && fetched.html) {
+        const $ = cheerio.load(fetched.html);
+        $("a[href]").each((_, el) => {
+          const href = $(el).attr("href")?.trim();
+          if (!href) return;
+          try {
+            const absoluteUrl = new URL(href, url);
+            absoluteUrl.hash = ""; // Remove hashes
+            const normalizedUrl = absoluteUrl.toString();
+            
+            if (
+              (absoluteUrl.hostname === rootDomain || absoluteUrl.hostname.endsWith(`.${rootDomain}`)) &&
+              !crawledPages.has(normalizedUrl) &&
+              !pagesToCrawl.includes(normalizedUrl) &&
+              !normalizedUrl.includes("#") &&
+              (normalizedUrl.startsWith("http://") || normalizedUrl.startsWith("https://"))
+            ) {
+              // Avoid common non-html files
+              const path = absoluteUrl.pathname.toLowerCase();
+              const isAsset = /\.(png|jpe?g|gif|svg|ico|css|js|woff2?|ttf|otf|mp4|webm|pdf|zip|gz|tar|exe|dmg|bin|apk)$/.test(path);
+              
+              if (!isAsset) {
+                pagesToCrawl.push(normalizedUrl);
+              }
+            }
+          } catch { /* ignore invalid URLs */ }
+        });
+      }
+    }
+  };
+
+  // Start concurrent workers
+  const workers = Array.from({ length: concurrency }).map(() => processNextPage());
+  await Promise.all(workers);
+
+  // Aggregate results (same logic as before, now with allResults populated by workers)
+  const pageCount = allResults.length;
+  if (pageCount === 0) {
+    // Should not happen if rootUrl is valid, but for safety:
+    return {
+      seoScore: 0, metaTitle: null, metaDescription: null, h1Count: 0, h2Count: 0, wordCount: 0,
+      internalLinks: 0, externalLinks: 0, imagesMissingAlt: 0, pageLoadScore: 0, mobileScore: 0,
+      pageCount: 0, issues: [], recommendations: []
+    };
+  }
+  const homePage = allResults[0];
+
+  const aggregated: SeoAnalysisResult = {
+    seoScore: Math.round(allResults.reduce((sum, r) => sum + r.seoScore, 0) / pageCount),
+    metaTitle: homePage.metaTitle,
+    metaDescription: homePage.metaDescription,
+    h1Count: allResults.reduce((sum, r) => sum + r.h1Count, 0),
+    h2Count: allResults.reduce((sum, r) => sum + r.h2Count, 0),
+    wordCount: allResults.reduce((sum, r) => sum + r.wordCount, 0),
+    internalLinks: allResults.reduce((sum, r) => sum + r.internalLinks, 0),
+    externalLinks: allResults.reduce((sum, r) => sum + r.externalLinks, 0),
+    imagesMissingAlt: allResults.reduce((sum, r) => sum + r.imagesMissingAlt, 0),
+    pageLoadScore: Math.round(allResults.reduce((sum, r) => sum + r.pageLoadScore, 0) / pageCount),
+    mobileScore: Math.round(allResults.reduce((sum, r) => sum + r.mobileScore, 0) / pageCount),
+    pageCount,
+    issues: allResults.flatMap(r => r.issues),
+    recommendations: [], // We'll aggregate recommendations below
+  };
+
+  // Aggregating recommendations (unique by title)
+  const recommendationMap = new Map<string, RecommendationDetail>();
+  allResults.forEach(r => {
+    r.recommendations.forEach(rec => {
+      if (!recommendationMap.has(rec.title)) {
+        recommendationMap.set(rec.title, { ...rec });
+      } else {
+        // If recommendation exists, maybe update description to mention multiple pages
+        const existing = recommendationMap.get(rec.title)!;
+        if (!existing.description.includes("multiple pages")) {
+           existing.description += " (Detected on multiple pages across the site)";
+        }
+      }
+    });
+  });
+  aggregated.recommendations = Array.from(recommendationMap.values());
+
+  return aggregated;
+}
+
+async function analyzePage(url: string): Promise<SeoAnalysisResult> {
   const fetched = await fetchPage(url);
 
   if (!fetched || !fetched.html) {
@@ -83,7 +197,7 @@ async function analyzeWebsite(url: string): Promise<SeoAnalysisResult> {
       seoScore: 0, metaTitle: null, metaDescription: null,
       h1Count: 0, h2Count: 0, wordCount: 0,
       internalLinks: 0, externalLinks: 0, imagesMissingAlt: 0,
-      pageLoadScore: 0, mobileScore: 0,
+      pageLoadScore: 0, mobileScore: 0, pageCount: 1,
       issues: [{
         category: "Crawlability", severity: "critical",
         title: "Page could not be fetched",
@@ -585,7 +699,7 @@ async function analyzeWebsite(url: string): Promise<SeoAnalysisResult> {
   return {
     seoScore: finalScore, metaTitle: titleText || null, metaDescription: metaDesc || null,
     h1Count, h2Count, wordCount, internalLinks, externalLinks,
-    imagesMissingAlt: altIssueCount, pageLoadScore, mobileScore,
+    imagesMissingAlt: altIssueCount, pageLoadScore, mobileScore, pageCount: 1,
     issues, recommendations,
   };
 }
@@ -751,7 +865,7 @@ async function analyzeYouTube(url: string): Promise<SeoAnalysisResult> {
     seoScore: finalScore, metaTitle: videoTitle || null, metaDescription: description || null,
     h1Count: 0, h2Count: 0, wordCount: description.split(" ").filter(w => w.length > 0).length,
     internalLinks: 0, externalLinks: 0, imagesMissingAlt: 0,
-    pageLoadScore: 0, mobileScore: 0, issues, recommendations,
+    pageLoadScore: 0, mobileScore: 0, pageCount: 1, issues, recommendations,
   };
 }
 
@@ -884,7 +998,7 @@ async function analyzeInstagram(url: string): Promise<SeoAnalysisResult> {
     h1Count: 0, h2Count: 0,
     wordCount: caption.split(" ").filter(w => w.length > 0).length,
     internalLinks: 0, externalLinks: hashtagCount,
-    imagesMissingAlt: 0, pageLoadScore: 0, mobileScore: 0,
+    imagesMissingAlt: 0, pageLoadScore: 0, mobileScore: 0, pageCount: 1,
     issues, recommendations,
   };
 }

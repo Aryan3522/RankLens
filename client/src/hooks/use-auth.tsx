@@ -10,8 +10,8 @@ type User = {
 };
 
 type AuthResponse = {
-  token: string;
   user: User;
+  token: string;
 };
 
 type AuthContextType = {
@@ -24,9 +24,8 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Initialize token from localStorage
-const TOKEN_KEY = "ranklens_auth_token";
-setAuthTokenGetter(() => localStorage.getItem(TOKEN_KEY));
+// Register token getter globally
+setAuthTokenGetter(() => localStorage.getItem("ranklens_token"));
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
@@ -34,14 +33,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const { data: user, isLoading } = useQuery<User | null>({
     queryKey: ["/api/auth/me"],
-    queryFn: () => customFetch("/api/auth/me").catch(() => null),
+    queryFn: () => customFetch<User | null>("/api/auth/me").catch(() => null),
     retry: false,
   });
 
   const loginMutation = useMutation({
     mutationFn: (data: any) => customFetch<AuthResponse>("/api/auth/login", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: (resp: AuthResponse) => {
-      localStorage.setItem(TOKEN_KEY, resp.token);
+      localStorage.setItem("ranklens_token", resp.token);
       queryClient.setQueryData(["/api/auth/me"], resp.user);
       toast({ title: "Welcome back!" });
     },
@@ -53,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const registerMutation = useMutation({
     mutationFn: (data: any) => customFetch<AuthResponse>("/api/auth/register", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: (resp: AuthResponse) => {
-      localStorage.setItem(TOKEN_KEY, resp.token);
+      localStorage.setItem("ranklens_token", resp.token);
       queryClient.setQueryData(["/api/auth/me"], resp.user);
       toast({ title: "Account created!" });
     },
@@ -65,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logoutMutation = useMutation({
     mutationFn: () => customFetch("/api/auth/logout", { method: "POST" }),
     onSuccess: () => {
-      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem("ranklens_token");
       queryClient.setQueryData(["/api/auth/me"], null);
       toast({ title: "Logged out" });
     },

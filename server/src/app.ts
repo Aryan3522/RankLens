@@ -11,61 +11,76 @@ import jwt from "jsonwebtoken";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { pool } from "./db/index.js";
+import { env } from "./lib/env.js";
 
 const app: Express = express();
-const PostgresStore = connectPgSimple(session);
-const JWT_SECRET = process.env.SESSION_SECRET || "development-secret";
 
-// --- Security & Performance ---
-app.use(helmet()); // Sets various security headers
-app.use(compression()); // Compresses response bodies
-app.set("trust proxy", 1); // Required for Vercel/Render behind a proxy
-
-// --- Middleware Setup ---
-const clientUrls = (process.env.CLIENT_URL || "http://localhost:8081")
+// --- 1. CORS (ABSOLUTE TOP) ---
+const clientUrls = (env.CLIENT_URL || "")
   .split(",")
-  .map((url) => url.trim().replace(/\/$/, ""));
+  .map((url: string) => url.trim().replace(/\/$/, ""))
+  .filter(Boolean);
 
-logger.info({ allowedOrigins: clientUrls }, "CORS configuration");
+const allowedOrigins = [...new Set([...clientUrls, "https://rank-lens-delta.vercel.app"])];
 
-// Logger first
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        logger.warn({ origin, allowed: allowedOrigins }, "CORS blocked origin");
+        callback(null, false);
+      }
+    },
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With", "X-CSRF-Token"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    optionsSuccessStatus: 200,
+  }),
+);
+
+const PostgresStore = connectPgSimple(session);
+
+// --- 2. Security & Performance ---
+app.use(helmet()); 
+app.use(compression());
+app.set("trust proxy", 1); 
+
+// --- 3. Logging & Parsers ---
 app.use(
   pinoHttp({
     logger,
     serializers: {
-      req(req: any) {
-        return {
-          id: req.id,
-          method: req.method,
-          url: req.url?.split("?")[0],
-        };
-      },
-      res(res: any) {
-        return {
-          statusCode: res.statusCode,
-        };
-      },
+      req: (req: any) => ({
+        id: req.id,
+        method: req.method,
+        url: req.url?.split("?")[0],
+        origin: req.headers.origin,
+      }),
     },
-  }),
-);
-
-// CORS restricted to CLIENT_URL for security
-app.use(
-  cors({
-    origin: clientUrls.length === 1 && clientUrls[0] === "true" ? true : clientUrls,
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   }),
 );
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// --- 4. Health Check (No DB dependency) ---
+app.get("/api/health", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    env: env.NODE_ENV,
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // --- Session & Auth Setup ---
 if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
   logger.error("SESSION_SECRET is required in production!");
 }
+
+const isProd = env.NODE_ENV === "production";
 
 app.use(
   session({
@@ -74,38 +89,23 @@ app.use(
       tableName: "session",
       createTableIfMissing: true,
     }),
-    secret: process.env.SESSION_SECRET || "development-secret",
+    secret: env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     proxy: true,
+    name: "ranklens.sid",
     cookie: {
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days for permanent login
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      secure: isProd, // Requires HTTPS in production
+      sameSite: isProd ? "none" : "lax", // 'none' is required for cross-origin cookies
+      path: "/",
     },
   })
 );
 
 app.use(passport.initialize());
 app.use(passport.session());
-
-// --- JWT Middleware (Run AFTER Passport to ensure it takes precedence) ---
-app.use((req: Request, _res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    const token = authHeader.split(" ")[1];
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      // Explicitly set the user from JWT, even if session/passport didn't find one
-      req.user = decoded;
-      logger.debug({ userId: (decoded as any).id }, "JWT Token verified");
-    } catch (err) {
-      logger.warn({ err: (err as Error).message }, "Invalid JWT token provided");
-    }
-  }
-  next();
-});
 
 // --- Rate Limiting ---
 const apiLimiter = rateLimit({
@@ -123,15 +123,28 @@ const apiLimiter = rateLimit({
 // Apply rate limiter and routes
 app.use("/api", apiLimiter, router);
 
+// Ping for debugging
+app.get("/api/ping", (req, res) => {
+  res.json({ pong: true, origin: req.headers.origin, allowed: allowedOrigins });
+});
+
 // --- Global Error Handler ---
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";
   
   logger.error({ err, status, message }, "Unhandled Application Error");
   
+  // MANUALLY set CORS headers for error responses as a final fail-safe
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+  
   res.status(status).json({
     error: process.env.NODE_ENV === "production" ? "Internal Server Error" : message,
+    debug: process.env.NODE_ENV === "production" ? undefined : err.stack,
   });
 });
 

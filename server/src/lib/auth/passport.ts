@@ -9,10 +9,11 @@ passport.use(
     { usernameField: "email" },
     async (email, password, done) => {
       try {
+        const normalizedEmail = email.trim().toLowerCase();
         const [user] = await db
           .select()
           .from(usersTable)
-          .where(eq(usersTable.email, email))
+          .where(eq(usersTable.email, normalizedEmail))
           .limit(1);
 
         if (!user) {

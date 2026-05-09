@@ -4,16 +4,19 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { db, usersTable } from "../db/index.js";
 import { eq } from "drizzle-orm";
+import { env } from "../lib/env.js";
+import { isAuthenticated } from "../middlewares/auth.js";
 
 const router = Router();
-const JWT_SECRET = process.env.SESSION_SECRET || "development-secret";
 
-router.post("/register", async (req, res) => {
-  const { email, password, name } = req.body;
+router.post("/register", async (req, res, next) => {
+  let { email, password, name } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required." });
   }
+
+  email = email.trim().toLowerCase();
 
   try {
     const existing = await db
@@ -37,16 +40,19 @@ router.post("/register", async (req, res) => {
     
     const user = results[0];
 
-    // Generate JWT
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "30d" });
+    const token = jwt.sign({ id: user.id }, env.JWT_SECRET, { expiresIn: "30d" });
 
-    return res.status(201).json({
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-      },
+    // Establish session (keep for backward compatibility if needed)
+    req.login(user, (err) => {
+      if (err) return next(err);
+      return res.status(201).json({
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
+      });
     });
   } catch (err: any) {
     res.status(500).json({ error: "Internal server error." });
@@ -54,34 +60,39 @@ router.post("/register", async (req, res) => {
 });
 
 router.post("/login", (req, res, next) => {
-  passport.authenticate("local", { session: false }, (err: any, user: any, info: any) => {
+  passport.authenticate("local", (err: any, user: any, info: any) => {
     if (err) return next(err);
     if (!user) return res.status(401).json({ error: info.message || "Authentication failed." });
 
-    // Generate JWT
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "30d" });
+    req.login(user, (loginErr) => {
+      if (loginErr) return next(loginErr);
+      
+      const token = jwt.sign({ id: user.id }, env.JWT_SECRET, { expiresIn: "30d" });
 
-    return res.json({
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-      },
+      return res.json({
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
+      });
     });
   })(req, res, next);
 });
 
-router.post("/logout", (req, res) => {
-  // Stateless JWT logout is usually handled by client by deleting the token
-  res.sendStatus(204);
+router.post("/logout", (req, res, next) => {
+  req.logout((err) => {
+    if (err) return next(err);
+    req.session.destroy((destroyErr) => {
+      if (destroyErr) return next(destroyErr);
+      res.clearCookie("ranklens.sid"); // Clear the session cookie
+      res.sendStatus(204);
+    });
+  });
 });
 
-router.get("/me", (req, res) => {
-  // This will be handled by the updated isAuthenticated middleware which sets req.user
-  if (!req.user) {
-    return res.status(401).json({ error: "Not authenticated." });
-  }
+router.get("/me", isAuthenticated, (req, res) => {
   const user = req.user as any;
   res.json({
     id: user.id,

@@ -47,9 +47,9 @@ export default function Dashboard() {
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
         ) : (
           <>
-            <StatCard label="Total Projects" value={summary?.totalProjects} icon={Globe} />
-            <StatCard label="Total Analyses" value={summary?.totalAnalyses} icon={Activity} />
-            <StatCard label="Tracked Keywords" value={summary?.totalKeywords} icon={Key} />
+            <StatCard label="Total Projects" value={summary?.totalProjects ?? null} icon={Globe} />
+            <StatCard label="Total Analyses" value={summary?.totalAnalyses ?? null} icon={Activity} />
+            <StatCard label="Tracked Keywords" value={summary?.totalKeywords ?? null} icon={Key} />
             <StatCard label="Avg SEO Score" value={summary?.avgSeoScore ? `${summary.avgSeoScore}/100` : null} icon={TrendingUp} sub="Across completed analyses" />
           </>
         )}
@@ -60,10 +60,10 @@ export default function Dashboard() {
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
         ) : (
           <>
-            <StatCard label="Critical Issues" value={summary?.criticalIssues} icon={AlertTriangle} color="text-destructive" />
-            <StatCard label="Pending Analyses" value={summary?.pendingAnalyses} icon={Clock} />
-            <StatCard label="Recommendations" value={summary?.recommendationsPending} icon={FileCheck} sub="Pending action" />
-            <StatCard label="Top Project" value={summary?.topPerformingProject} icon={Star} color="text-amber-500" />
+            <StatCard label="Critical Issues" value={summary?.criticalIssues ?? null} icon={AlertTriangle} color="text-destructive" />
+            <StatCard label="Pending Analyses" value={summary?.pendingAnalyses ?? null} icon={Clock} />
+            <StatCard label="Recommendations" value={summary?.recommendationsPending ?? null} icon={FileCheck} sub="Pending action" />
+            <StatCard label="Top Project" value={summary?.topPerformingProject ?? null} icon={Star} color="text-amber-500" />
           </>
         )}
       </div>
