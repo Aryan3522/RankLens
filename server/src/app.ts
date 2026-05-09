@@ -11,35 +11,54 @@ import { generalRateLimiter } from "./lib/concurrency.js";
 const app: Express = express();
 
 // --- 1. CORS Configuration ---
+const clientUrls = (env.CLIENT_URL || "")
+  .split(",")
+  .map((url: string) => url.trim().replace(/\/$/, ""))
+  .filter(Boolean);
+
 const allowedOrigins = [
-  "https://rank-lens-delta.vercel.app",
-  "http://localhost:5173",
+  ...new Set([
+    ...clientUrls,
+    "https://rank-lens-delta.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:8081", // Added from your .env
+  ]),
 ];
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl) - optional, but standard for public APIs
-    // For maximum security per your request "no one else should be able to send request",
-    // we block even no-origin requests if we want to be 100% strict, but usually browsers always send origin.
-    if (!origin) return callback(null, false); 
+    // If no origin (like mobile or curl), allow it
+    if (!origin) return callback(null, true);
     
     const normalizedOrigin = origin.replace(/\/$/, "");
     if (allowedOrigins.includes(normalizedOrigin)) {
       callback(null, true);
     } else {
       logger.warn({ origin, allowed: allowedOrigins }, "CORS blocked unauthorized origin");
-      callback(new Error("Not allowed by CORS"), false);
+      // Use null instead of Error to avoid triggering the global error handler during preflight
+      callback(null, false);
     }
   },
   credentials: false,
-  allowedHeaders: ["Content-Type", "Accept", "X-Requested-With"],
-  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Accept", "X-Requested-With", "Authorization"],
+  methods: ["GET", "POST", "OPTIONS", "DELETE", "PUT", "PATCH"],
   preflightContinue: false,
-  optionsSuccessStatus: 204,
+  optionsSuccessStatus: 200, // Changed from 204 to 200 for broader compatibility
 };
 
 // Apply CORS middleware
 app.use(cors(corsOptions));
+
+// Handle OPTIONS preflight for all routes using a safe middleware approach
+// to avoid Express 5 path-to-regexp syntax errors with strings like "*" or "/*"
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    return cors(corsOptions)(req, res, next);
+  }
+  next();
+});
+
+// Also provide an explicit options handler using a RegExp literal which is safe in Express 5
 app.options(/.*/, cors(corsOptions));
 
 // --- 2. Security & Performance ---
