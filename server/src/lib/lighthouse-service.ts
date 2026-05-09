@@ -30,11 +30,11 @@ export async function runLighthouseAudit(url: string): Promise<LighthouseAuditRe
   let chrome;
   try {
     chrome = await chromeLauncher.launch({
-      chromeFlags: ['--headless', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage']
+      chromeFlags: ['--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage']
     });
 
     const options = {
-      logLevel: 'info' as const,
+      logLevel: 'error' as const, // Suppress internal CDP "ERR:error" logs
       output: 'json' as const,
       onlyCategories: ['seo', 'performance', 'accessibility', 'best-practices'],
       port: chrome.port,

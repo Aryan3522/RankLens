@@ -252,6 +252,16 @@ async function analyzePage(url: string): Promise<SeoAnalysisResult> {
     issues.push({ category: "Content", severity: "warning", title: "Thin content detected", description: "Pages with under 300 words rarely rank well.", affectedUrl: resolvedUrl, element: `Word count: ${wordCount}`, lineNumber: null, fixExample: null, helpUrl: null });
   }
 
+  // ── LINK COUNTING (RESTORING MISSING LOGIC) ──
+  let internalLinks = 0;
+  let externalLinks = 0;
+  $("a[href]").each((_, el) => {
+    const href = $(el).attr("href")?.trim();
+    if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
+    if (href.startsWith("http")) externalLinks++;
+    else internalLinks++;
+  });
+
   // 4. RETURN MERGED DATA
   return {
     seoScore: Math.min(100, (lighthouseResult.seoScore || 70)),
