@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   useCreateAnalysis, useListAnalyses, useListProjects,
   getListAnalysesQueryKey, useDeleteAnalysis
@@ -17,42 +17,51 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 
 type AnalysisType = "website" | "youtube" | "instagram";
+type SortOption =
+  | "newest"
+  | "oldest"
+  | "az"
+  | "za"
+  | "highestScore"
+  | "lowestScore";
 
 const ANALYSIS_TABS: { type: AnalysisType; label: string; icon: any; placeholder: string }[] = [
-  { type: "website",   label: "Website",   icon: Globe,      placeholder: "https://example.com" },
-  { type: "youtube",   label: "YouTube",   icon: Youtube,    placeholder: "https://youtube.com/watch?v=..." },
-  { type: "instagram", label: "Instagram", icon: Instagram,  placeholder: "https://instagram.com/p/..." },
+  { type: "website", label: "Website", icon: Globe, placeholder: "https://example.com" },
+  { type: "youtube", label: "YouTube", icon: Youtube, placeholder: "https://youtube.com/watch?v=..." },
+  { type: "instagram", label: "Instagram", icon: Instagram, placeholder: "https://instagram.com/p/..." },
 ];
 
 function StatusIcon({ status }: { status: string }) {
   if (status === "completed") return <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />;
-  if (status === "failed")    return <XCircle    className="w-4 h-4 text-red-500 shrink-0" />;
-  if (status === "running")   return <RefreshCw  className="w-4 h-4 text-blue-500 animate-spin shrink-0" />;
-  if (status === "queued")    return <Clock      className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />;
+  if (status === "failed") return <XCircle className="w-4 h-4 text-red-500 shrink-0" />;
+  if (status === "running") return <RefreshCw className="w-4 h-4 text-blue-500 animate-spin shrink-0" />;
+  if (status === "queued") return <Clock className="w-4 h-4 text-amber-500 animate-pulse shrink-0" />;
   return <Clock className="w-4 h-4 text-amber-500 shrink-0" />;
 }
 
 export default function Analyzer() {
-  const [url, setUrl]           = useState("");
-  const [type, setType]         = useState<AnalysisType>("website");
+  const [url, setUrl] = useState("");
+  const [type, setType] = useState<AnalysisType>("website");
   const [projectId, setProjectId] = useState<string>("none");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [sortBy, setSortBy] =
+    useState<SortOption>("newest");
 
   const { data: analyses, isLoading } = useListAnalyses();
   const { data: projects } = useListProjects();
   const createAnalysis = useCreateAnalysis();
   const deleteAnalysis = useDeleteAnalysis();
-  const queryClient    = useQueryClient();
-  const { toast }      = useToast();
-  const [, navigate]   = useLocation();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   // Find active tab safely
   const activeTab = ANALYSIS_TABS.find(t => t.type === type) || ANALYSIS_TABS[0];
 
   const handleSubmit = () => {
     if (!url.trim()) return;
-    
+
     createAnalysis.mutate(
       { data: { url: url.trim(), type, projectId: projectId && projectId !== "none" ? projectId : null } },
       {
@@ -61,17 +70,17 @@ export default function Analyzer() {
           setUrl("");
           const msg = data?.url ? `Analyzing ${data.url}` : "Analysis started";
           toast({ title: "Analysis started", description: msg });
-          
+
           // Re-fetch after short delay to catch progress
           setTimeout(() => {
-             queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
+            queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
           }, 2000);
         },
         onError: (err: any) => {
-          toast({ 
-            title: "Error", 
-            description: err?.data?.error || "Failed to start analysis", 
-            variant: "destructive" 
+          toast({
+            title: "Error",
+            description: err?.data?.error || "Failed to start analysis",
+            variant: "destructive"
           });
         },
       }
@@ -104,7 +113,69 @@ export default function Analyzer() {
     });
   };
 
-  const sorted = Array.isArray(analyses) ? [...analyses].reverse() : [];
+  // const sorted = Array.isArray(analyses) ? [...analyses].reverse() : [];
+  const sorted = useMemo(() => {
+    if (!Array.isArray(analyses)) {
+      return [];
+    }
+
+    const copied = [...analyses];
+
+    switch (sortBy) {
+      case "newest":
+        return copied.sort(
+          (a, b) =>
+            new Date(
+              b.createdAt,
+            ).getTime() -
+            new Date(
+              a.createdAt,
+            ).getTime(),
+        );
+
+      case "oldest":
+        return copied.sort(
+          (a, b) =>
+            new Date(
+              a.createdAt,
+            ).getTime() -
+            new Date(
+              b.createdAt,
+            ).getTime(),
+        );
+
+      case "az":
+        return copied.sort((a, b) =>
+          a.url.localeCompare(
+            b.url,
+          ),
+        );
+
+      case "za":
+        return copied.sort((a, b) =>
+          b.url.localeCompare(
+            a.url,
+          ),
+        );
+
+      case "highestScore":
+        return copied.sort(
+          (a, b) =>
+            (b.seoScore || 0) -
+            (a.seoScore || 0),
+        );
+
+      case "lowestScore":
+        return copied.sort(
+          (a, b) =>
+            (a.seoScore || 0) -
+            (b.seoScore || 0),
+        );
+
+      default:
+        return copied;
+    }
+  }, [analyses, sortBy]);
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -120,11 +191,10 @@ export default function Analyzer() {
             <button
               key={t}
               onClick={() => setType(t)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                type === t
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${type === t
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                }`}
             >
               <Icon className="w-4 h-4" />
               {label}
@@ -180,13 +250,71 @@ export default function Analyzer() {
 
       {/* Recent analyses */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        {/* <div className="flex items-center justify-between">
           <h2 className="font-semibold text-foreground">Recent Analyses</h2>
           {sorted.length > 0 && (
             <span className="text-xs text-muted-foreground font-medium px-2 py-1 bg-muted rounded-full">
               {sorted.length} total
             </span>
           )}
+        </div> */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="font-semibold text-foreground">
+              Recent Analyses
+            </h2>
+
+            {sorted.length > 0 && (
+              <span className="text-xs text-muted-foreground font-medium px-2 py-1 bg-muted rounded-full">
+                {sorted.length} total
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">
+              Sort By
+            </span>
+
+            <Select
+              value={sortBy}
+              onValueChange={(value) =>
+                setSortBy(
+                  value as SortOption,
+                )
+              }
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Sort analyses" />
+              </SelectTrigger>
+
+              <SelectContent>
+                <SelectItem value="newest">
+                  Newest First
+                </SelectItem>
+
+                <SelectItem value="oldest">
+                  Oldest First
+                </SelectItem>
+
+                <SelectItem value="az">
+                  URL A → Z
+                </SelectItem>
+
+                <SelectItem value="za">
+                  URL Z → A
+                </SelectItem>
+
+                <SelectItem value="highestScore">
+                  Highest SEO Score
+                </SelectItem>
+
+                <SelectItem value="lowestScore">
+                  Lowest SEO Score
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {isLoading ? (
@@ -209,9 +337,8 @@ export default function Analyzer() {
                     </div>
                     {an.seoScore != null && (
                       <div className="text-right shrink-0">
-                        <p className={`text-lg font-black ${
-                          an.seoScore >= 80 ? "text-emerald-600" : an.seoScore >= 60 ? "text-amber-600" : "text-red-600"
-                        }`}>
+                        <p className={`text-lg font-black ${an.seoScore >= 80 ? "text-emerald-600" : an.seoScore >= 60 ? "text-amber-600" : "text-red-600"
+                          }`}>
                           {an.seoScore}
                         </p>
                         <p className="text-[10px] text-muted-foreground font-bold uppercase">Score</p>
@@ -235,7 +362,7 @@ export default function Analyzer() {
                     <button
                       onClick={(e) => handleDelete(an.id, e)}
                       disabled={deleting === an.id}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-all focus:opacity-100"
+                      className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-all focus:opacity-100"
                       title="Delete this analysis"
                     >
                       {deleting === an.id
