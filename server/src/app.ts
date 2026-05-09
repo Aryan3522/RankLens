@@ -6,19 +6,20 @@ import { pinoHttp } from "pino-http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "./lib/auth/passport.js";
-import { rateLimit } from "express-rate-limit";
 import jwt from "jsonwebtoken";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { pool } from "./db/index.js";
 import { env } from "./lib/env.js";
+import { generalRateLimiter } from "./lib/concurrency.js";
 
 const app: Express = express();
 
 // --- 1. CORS (ABSOLUTE TOP) ---
+// Parse and normalize allowed origins from environment
 const clientUrls = (env.CLIENT_URL || "")
   .split(",")
-  .map((url: string) => url.trim().replace(/\/$/, ""))
+  .map((url: string) => url.trim().replace(/\/$/, "")) // Remove trailing slashes
   .filter(Boolean);
 
 const allowedOrigins = [...new Set([...clientUrls, "https://rank-lens-delta.vercel.app"])];
@@ -26,7 +27,8 @@ const allowedOrigins = [...new Set([...clientUrls, "https://rank-lens-delta.verc
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow requests with no origin (like mobile apps or curl) or matched origins
+      if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
         callback(null, true);
       } else {
         logger.warn({ origin, allowed: allowedOrigins }, "CORS blocked origin");
@@ -65,7 +67,7 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- 4. Health Check (No DB dependency) ---
+// --- 4. Health Check ---
 app.get("/api/health", (req, res) => {
   res.json({ 
     status: "ok", 
@@ -76,11 +78,10 @@ app.get("/api/health", (req, res) => {
 });
 
 // --- Session & Auth Setup ---
-if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+const isProd = env.NODE_ENV === "production";
+if (isProd && !process.env.SESSION_SECRET) {
   logger.error("SESSION_SECRET is required in production!");
 }
-
-const isProd = env.NODE_ENV === "production";
 
 app.use(
   session({
@@ -95,7 +96,7 @@ app.use(
     proxy: true,
     name: "ranklens.sid",
     cookie: {
-      maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days for permanent login
+      maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
       httpOnly: true,
       secure: isProd, // Requires HTTPS in production
       sameSite: isProd ? "none" : "lax", // 'none' is required for cross-origin cookies
@@ -107,28 +108,32 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-// --- Rate Limiting ---
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  validate: { keyGeneratorIpFallback: false },
-  message: { error: "Too many requests, please try again later." },
-  keyGenerator: (req) => {
-    return (req as any).user?.id?.toString() || req.ip || "anonymous";
-  },
-});
+// --- 5. Custom Enterprise Rate Limiting ---
+const apiRateLimitMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  const key = (req as any).user?.id?.toString() || req.ip || "anonymous";
+  if (generalRateLimiter.isRateLimited(key)) {
+    return res.status(429).json({ 
+      error: "Too many requests, please try again later.",
+      retryAfter: "15 minutes"
+    });
+  }
+  next();
+};
 
 // Apply rate limiter and routes
-app.use("/api", apiLimiter, router);
+app.use("/api", apiRateLimitMiddleware, router);
 
 // Ping for debugging
 app.get("/api/ping", (req, res) => {
-  res.json({ pong: true, origin: req.headers.origin, allowed: allowedOrigins });
+  res.json({ 
+    pong: true, 
+    origin: req.headers.origin, 
+    allowed: allowedOrigins,
+    env: env.NODE_ENV
+  });
 });
 
-// --- Global Error Handler ---
+// --- 6. Global Error Handler (With CORS Fail-safe) ---
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";
@@ -137,7 +142,7 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   
   // MANUALLY set CORS headers for error responses as a final fail-safe
   const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
+  if (origin && allowedOrigins.includes(origin.replace(/\/$/, ""))) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
   }
