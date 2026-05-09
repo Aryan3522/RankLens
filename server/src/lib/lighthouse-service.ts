@@ -18,6 +18,8 @@ export interface LighthouseAuditResult {
   lcp: string;
   cls: string;
   fcp: string;
+  tti: string;
+  speedIndex: string;
   failedAudits: LighthouseAuditDetail[];
 }
 
@@ -67,6 +69,8 @@ export async function runLighthouseAudit(url: string): Promise<LighthouseAuditRe
       lcp: audits['largest-contentful-paint']?.displayValue || "N/A",
       cls: audits['cumulative-layout-shift']?.displayValue || "N/A",
       fcp: audits['first-contentful-paint']?.displayValue || "N/A",
+      tti: audits['interactive']?.displayValue || "N/A",
+      speedIndex: audits['speed-index']?.displayValue || "N/A",
       failedAudits,
     };
 

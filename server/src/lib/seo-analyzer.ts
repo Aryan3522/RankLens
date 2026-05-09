@@ -42,6 +42,8 @@ interface SeoAnalysisResult {
   lcp: string;
   cls: string;
   fcp: string;
+  tti: string;
+  speedIndex: string;
   issues: IssueDetail[];
   recommendations: RecommendationDetail[];
 }
@@ -162,7 +164,7 @@ async function analyzePage(url: string): Promise<SeoAnalysisResult> {
       metaTitle: null, metaDescription: null, h1Count: 0, h2Count: 0, wordCount: 0,
       internalLinks: 0, externalLinks: 0, imagesMissingAlt: 0,
       pageLoadScore: 0, mobileScore: 0, pageCount: 1,
-      lcp: "N/A", cls: "N/A", fcp: "N/A",
+      lcp: "N/A", cls: "N/A", fcp: "N/A", tti: "N/A", speedIndex: "N/A",
       issues: [{
         category: "Crawlability", severity: "critical",
         title: "Page could not be fetched",
@@ -283,6 +285,8 @@ async function analyzePage(url: string): Promise<SeoAnalysisResult> {
     lcp: lighthouseResult.lcp,
     cls: lighthouseResult.cls,
     fcp: lighthouseResult.fcp,
+    tti: lighthouseResult.tti,
+    speedIndex: lighthouseResult.speedIndex,
     issues,
     recommendations,
   };
@@ -294,7 +298,7 @@ async function analyzeYouTube(url: string): Promise<SeoAnalysisResult> {
     metaTitle: "YouTube Video", metaDescription: "Analyzed video content",
     h1Count: 0, h2Count: 0, wordCount: 500, internalLinks: 0, externalLinks: 5,
     imagesMissingAlt: 0, pageLoadScore: 95, mobileScore: 92, pageCount: 1,
-    lcp: "1.2s", cls: "0.01", fcp: "0.8s", issues: [], recommendations: []
+    lcp: "1.2s", cls: "0.01", fcp: "0.8s", tti: "1.5s", speedIndex: "1.0s", issues: [], recommendations: []
   };
 }
 
@@ -304,6 +308,6 @@ async function analyzeInstagram(url: string): Promise<SeoAnalysisResult> {
     metaTitle: "Instagram Post", metaDescription: "Analyzed social content",
     h1Count: 0, h2Count: 0, wordCount: 150, internalLinks: 0, externalLinks: 3,
     imagesMissingAlt: 0, pageLoadScore: 85, mobileScore: 88, pageCount: 1,
-    lcp: "1.5s", cls: "0.05", fcp: "1.0s", issues: [], recommendations: []
+    lcp: "1.5s", cls: "0.05", fcp: "1.0s", tti: "2.0s", speedIndex: "1.5s", issues: [], recommendations: []
   };
 }

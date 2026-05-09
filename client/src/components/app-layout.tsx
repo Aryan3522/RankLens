@@ -1,7 +1,6 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, FolderOpen, Search, Key, FileText, BarChart2, Menu, X, LogOut, Loader2 } from "lucide-react";
-import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/use-auth";
+import { LayoutDashboard, FolderOpen, Search, Key, FileText, BarChart2, Menu, X } from "lucide-react";
+import { useState } from "react";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -14,23 +13,6 @@ const navItems = [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, logout, isLoading } = useAuth();
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      setLocation("/auth");
-    }
-  }, [user, isLoading, setLocation]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user) return null;
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -65,16 +47,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="p-4 border-t border-sidebar-border space-y-4">
           <div className="px-3">
-            <p className="text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">User</p>
-            <p className="text-sm text-sidebar-foreground truncate mt-1">{user.email}</p>
+            <p className="text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">Local Mode</p>
+            <p className="text-sm text-sidebar-foreground/70 mt-1">Data saved securely in your browser.</p>
           </div>
-          <button
-            onClick={() => logout()}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-sidebar-foreground/70 hover:bg-destructive/10 hover:text-destructive transition-colors"
-          >
-            <LogOut className="w-4 h-4 shrink-0" />
-            Sign Out
-          </button>
         </div>
       </aside>
 

@@ -2,7 +2,6 @@ import "dotenv/config";
 import { env } from "./lib/env.js";
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
-import { startCleanupTask } from "./lib/cleanup.js";
 
 const port = env.PORT;
 
@@ -15,11 +14,6 @@ process.on("uncaughtException", (err) => {
   logger.error({ err }, "Uncaught Exception thrown");
   process.exit(1);
 });
-
-// Start auto-deletion cleanup task (3 days TTL)
-if (env.NODE_ENV !== "test") {
-  startCleanupTask();
-}
 
 if (env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
   if (Number.isNaN(port) || port <= 0) {

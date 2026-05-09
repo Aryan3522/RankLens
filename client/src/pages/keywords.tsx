@@ -56,7 +56,7 @@ export default function Keywords() {
     createKeyword.mutate(
       {
         data: {
-          projectId: Number(projectId),
+          projectId: projectId,
           keyword: kwInput.trim(),
           searchVolume: volume ? Number(volume) : null,
           difficulty: difficulty ? Number(difficulty) : null,
@@ -73,7 +73,7 @@ export default function Keywords() {
     );
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: string) => {
     if (!confirm("Stop tracking this keyword?")) return;
     deleteKeyword.mutate({ id }, {
       onSuccess: () => {
@@ -85,7 +85,7 @@ export default function Keywords() {
 
   const filtered = filterProject === "all"
     ? keywords
-    : keywords?.filter(k => String(k.projectId) === filterProject);
+    : keywords?.filter(k => k.projectId === filterProject);
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">

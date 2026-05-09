@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useGetAnalysis, getGetAnalysisQueryKey, useRerunAnalysis, getListAnalysesQueryKey } from "@/api";
-import { customFetch } from "@/api/custom-fetch";
+import { useGetAnalysis, getGetAnalysisQueryKey, useRerunAnalysis, getListAnalysesQueryKey, useDeleteAnalysis } from "@/api";
 import { Link, useLocation } from "wouter";
 import {
   ArrowLeft, RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle, Info,
@@ -53,8 +52,8 @@ function TypeIcon({ type }: { type: string }) {
 }
 
 type SeoIssue = {
-  id: number;
-  analysisId: number;
+  id: string;
+  analysisId: string;
   category: string;
   severity: string;
   title: string;
@@ -176,8 +175,8 @@ function IssueCard({ issue }: { issue: SeoIssue }) {
 }
 
 type Recommendation = {
-  id: number;
-  analysisId: number;
+  id: string;
+  analysisId: string;
   priority: string;
   category: string;
   title: string;
@@ -208,18 +207,19 @@ function RecommendationCard({ rec }: { rec: Recommendation }) {
   );
 }
 
-export default function AnalysisDetail({ id }: { id: number }) {
+export default function AnalysisDetail({ id }: { id: string }) {
   const { data: analysis, isLoading, refetch } = useGetAnalysis(id, {
     query: {
       enabled: !!id,
       queryKey: getGetAnalysisQueryKey(id),
-      refetchInterval: (query) => {
+      refetchInterval: (query: any) => {
         const status = (query.state.data as any)?.status;
         return status === "running" ? 2000 : false;
       },
     },
   });
   const rerun = useRerunAnalysis();
+  const deleteAnalysis = useDeleteAnalysis();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -233,16 +233,18 @@ export default function AnalysisDetail({ id }: { id: number }) {
       return;
     }
     setDeleting(true);
-    try {
-      await customFetch(`/api/analyses/${id}`, { method: "DELETE" });
-      queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
-      toast({ title: "Analysis deleted" });
-      navigate("/analyzer");
-    } catch {
-      toast({ title: "Error", description: "Could not delete analysis.", variant: "destructive" });
-      setDeleting(false);
-      setConfirmDelete(false);
-    }
+    deleteAnalysis.mutate({ id }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
+        toast({ title: "Analysis deleted" });
+        navigate("/analyzer");
+      },
+      onError: () => {
+        toast({ title: "Error", description: "Could not delete analysis.", variant: "destructive" });
+        setDeleting(false);
+        setConfirmDelete(false);
+      }
+    });
   };
 
   const handleRerun = () => {
@@ -400,6 +402,14 @@ export default function AnalysisDetail({ id }: { id: number }) {
             <div className="flex justify-between items-center text-sm">
               <span className="text-muted-foreground">FCP (First)</span>
               <span className="font-mono font-bold text-primary">{analysis.fcp || "—"}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">TTI (Interactive)</span>
+              <span className="font-mono font-bold text-primary">{analysis.tti || "—"}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Speed Index</span>
+              <span className="font-mono font-bold text-primary">{analysis.speedIndex || "—"}</span>
             </div>
           </div>
         </div>
