@@ -19,7 +19,7 @@ const app: Express = express();
 // Parse and normalize allowed origins from environment
 const clientUrls = (env.CLIENT_URL || "")
   .split(",")
-  .map((url: string) => url.trim().replace(/\/$/, "")) // Remove trailing slashes
+  .map((url: string) => url.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
 const allowedOrigins = [...new Set([...clientUrls, "https://rank-lens-delta.vercel.app"])];
@@ -27,8 +27,9 @@ const allowedOrigins = [...new Set([...clientUrls, "https://rank-lens-delta.verc
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl) or matched origins
-      if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
+      // Allow requests with no origin (like mobile apps) OR matched origins
+      // We check for exact match OR match without trailing slash
+      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
         callback(null, true);
       } else {
         logger.warn({ origin, allowed: allowedOrigins }, "CORS blocked origin");
@@ -38,14 +39,17 @@ app.use(
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With", "X-CSRF-Token"],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    optionsSuccessStatus: 200,
+    preflightContinue: false,
+    optionsSuccessStatus: 204, // Use 204 for OPTIONS pre-flight success
   }),
 );
 
 const PostgresStore = connectPgSimple(session);
 
 // --- 2. Security & Performance ---
-app.use(helmet()); 
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+})); 
 app.use(compression());
 app.set("trust proxy", 1); 
 
@@ -99,7 +103,7 @@ app.use(
       maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
       httpOnly: true,
       secure: isProd, // Requires HTTPS in production
-      sameSite: isProd ? "none" : "lax", // 'none' is required for cross-origin cookies
+      sameSite: isProd ? "none" : "lax", // 'none' for cross-origin
       path: "/",
     },
   })
@@ -110,6 +114,9 @@ app.use(passport.session());
 
 // --- 5. Custom Enterprise Rate Limiting ---
 const apiRateLimitMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  // SKIP rate limiting for OPTIONS pre-flight requests
+  if (req.method === "OPTIONS") return next();
+
   const key = (req as any).user?.id?.toString() || req.ip || "anonymous";
   if (generalRateLimiter.isRateLimited(key)) {
     return res.status(429).json({ 
@@ -142,9 +149,11 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   
   // MANUALLY set CORS headers for error responses as a final fail-safe
   const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin.replace(/\/$/, ""))) {
+  if (origin && (allowedOrigins.includes(origin) || allowedOrigins.includes(origin.replace(/\/$/, "")))) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, X-Requested-With, X-CSRF-Token");
   }
   
   res.status(status).json({
