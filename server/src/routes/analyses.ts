@@ -9,6 +9,8 @@ import {
 } from "../types/generated/api.js";
 import { generateSeoAnalysis } from "../lib/seo-analyzer.js";
 import { isAuthenticated } from "../middlewares/auth.js";
+import { analysisQueue, analysisRateLimiter } from "../lib/concurrency.js";
+import { emitAnalysisProgress } from "../lib/analysis-events.js";
 
 const router: IRouter = Router();
 
@@ -47,6 +49,12 @@ router.post("/analyses", isAuthenticated, async (req, res): Promise<void> => {
     return;
   }
 
+  // Rate Limiting (Local)
+  if (analysisRateLimiter.isRateLimited(`user_${user.id}`)) {
+    res.status(429).json({ error: "Analysis limit reached. Please wait." });
+    return;
+  }
+
   const [analysis] = await db.insert(analysesTable).values({
     userId: user.id,
     url: parsed.data.url,
@@ -55,19 +63,20 @@ router.post("/analyses", isAuthenticated, async (req, res): Promise<void> => {
     status: "running",
   }).returning();
 
-  runAnalysisAsync(analysis.id, parsed.data.url, parsed.data.type);
+  analysisQueue.add(() => runAnalysisAsync(analysis.id, parsed.data.url, parsed.data.type));
 
   res.status(201).json({
     ...analysis,
     createdAt: analysis.createdAt.toISOString(),
     completedAt: null,
+    queuePosition: analysisQueue.getPendingCount()
   });
 });
 
 router.get("/analyses/:id", isAuthenticated, async (req, res): Promise<void> => {
   const user = req.user as any;
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = GetAnalysisParams.safeParse({ id: parseInt(raw, 10) });
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = GetAnalysisParams.safeParse({ id: parseInt(rawId, 10) });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
@@ -97,8 +106,8 @@ router.get("/analyses/:id", isAuthenticated, async (req, res): Promise<void> => 
 
 router.delete("/analyses/:id", isAuthenticated, async (req, res): Promise<void> => {
   const user = req.user as any;
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const id = parseInt(raw, 10);
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(rawId, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
@@ -123,8 +132,8 @@ router.delete("/analyses/:id", isAuthenticated, async (req, res): Promise<void> 
 
 router.post("/analyses/:id/rerun", isAuthenticated, async (req, res): Promise<void> => {
   const user = req.user as any;
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const params = RerunAnalysisParams.safeParse({ id: parseInt(raw, 10) });
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const params = RerunAnalysisParams.safeParse({ id: parseInt(rawId, 10) });
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
     return;
@@ -140,6 +149,11 @@ router.post("/analyses/:id/rerun", isAuthenticated, async (req, res): Promise<vo
     return;
   }
 
+  if (analysisRateLimiter.isRateLimited(`user_${user.id}`)) {
+    res.status(429).json({ error: "Analysis limit reached. Please wait." });
+    return;
+  }
+
   await db.delete(seoIssuesTable).where(eq(seoIssuesTable.analysisId, existing.id));
   await db.delete(recommendationsTable).where(eq(recommendationsTable.analysisId, existing.id));
 
@@ -149,12 +163,13 @@ router.post("/analyses/:id/rerun", isAuthenticated, async (req, res): Promise<vo
     .where(eq(analysesTable.id, existing.id))
     .returning();
 
-  runAnalysisAsync(updated.id, updated.url, updated.type);
+  analysisQueue.add(() => runAnalysisAsync(updated.id, updated.url, updated.type));
 
   res.json({
     ...updated,
     createdAt: updated.createdAt.toISOString(),
     completedAt: null,
+    queuePosition: analysisQueue.getPendingCount()
   });
 });
 
@@ -165,6 +180,9 @@ async function runAnalysisAsync(analysisId: number, url: string, type: string) {
     await db.update(analysesTable).set({
       status: "completed",
       seoScore: result.seoScore,
+      performanceScore: result.performanceScore,
+      accessibilityScore: result.accessibilityScore,
+      bestPracticesScore: result.bestPracticesScore,
       issueCount: result.issues.length,
       metaTitle: result.metaTitle,
       metaDescription: result.metaDescription,
@@ -176,6 +194,9 @@ async function runAnalysisAsync(analysisId: number, url: string, type: string) {
       imagesMissingAlt: result.imagesMissingAlt,
       pageLoadScore: result.pageLoadScore,
       mobileScore: result.mobileScore,
+      lcp: result.lcp,
+      cls: result.cls,
+      fcp: result.fcp,
       completedAt: new Date(),
     }).where(eq(analysesTable.id, analysisId));
 
@@ -186,7 +207,8 @@ async function runAnalysisAsync(analysisId: number, url: string, type: string) {
     if (result.recommendations.length > 0) {
       await db.insert(recommendationsTable).values(result.recommendations.map(r => ({ ...r, analysisId })));
     }
-  } catch {
+  } catch (err) {
+    console.error("Analysis failed:", err);
     await db.update(analysesTable).set({ status: "failed" }).where(eq(analysesTable.id, analysisId));
   }
 }

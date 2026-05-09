@@ -4,7 +4,8 @@ import { customFetch } from "@/api/custom-fetch";
 import { Link, useLocation } from "wouter";
 import {
   ArrowLeft, RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle, Info,
-  Globe, Youtube, Instagram, ExternalLink, ChevronDown, ChevronUp, Code, Wrench, BookOpen, Trash2
+  Globe, Youtube, Instagram, ExternalLink, ChevronDown, ChevronUp, Code, Wrench, BookOpen, Trash2,
+  Activity, Zap, ShieldCheck, Accessibility as AccessibilityIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,6 +14,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadialBarChart, RadialBar, ResponsiveContainer } from "recharts";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+
+function ScoreCard({ label, score, icon: Icon }: { label: string; score: number | null; icon: any }) {
+  const scoreColor = score === null ? "#94a3b8" : score >= 80 ? "#10b981" : score >= 60 ? "#f59e0b" : "#ef4444";
+  return (
+    <div className="bg-card border border-border rounded-xl p-4 flex flex-col items-center justify-center">
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="w-4 h-4 text-muted-foreground" />
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
+      </div>
+      <div className="text-2xl font-bold" style={{ color: scoreColor }}>{score ?? "—"}</div>
+      <div className="w-full h-1 bg-muted rounded-full mt-2 overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${score ?? 0}%`, backgroundColor: scoreColor }} />
+      </div>
+    </div>
+  );
+}
 
 function SeverityIcon({ severity }: { severity: string }) {
   if (severity === "critical") return <XCircle className="w-4 h-4 text-red-500 shrink-0" />;
@@ -35,12 +52,6 @@ function TypeIcon({ type }: { type: string }) {
   return <Globe className="w-4 h-4" />;
 }
 
-function SeverityBanner({ severity }: { severity: string }) {
-  if (severity === "critical") return <div className="h-1 w-full rounded-t-xl bg-red-500 -mt-4 mb-0 -mx-4" style={{ width: "calc(100% + 2rem)" }} />;
-  if (severity === "warning") return <div className="h-1 w-full rounded-t-xl bg-amber-400 -mt-4 mb-0 -mx-4" style={{ width: "calc(100% + 2rem)" }} />;
-  return <div className="h-1 w-full rounded-t-xl bg-blue-400 -mt-4 mb-0 -mx-4" style={{ width: "calc(100% + 2rem)" }} />;
-}
-
 type SeoIssue = {
   id: number;
   analysisId: number;
@@ -57,13 +68,11 @@ type SeoIssue = {
 
 function IssueCard({ issue }: { issue: SeoIssue }) {
   const [expanded, setExpanded] = useState(false);
-  const hasDetails = issue.element || issue.fixExample || issue.lineNumber || issue.helpUrl;
+  const hasDetails = !!(issue.element || issue.fixExample || issue.lineNumber || issue.helpUrl);
 
-  const severityBg = {
-    critical: "border-red-200 bg-red-50/30",
-    warning: "border-amber-200 bg-amber-50/20",
-    info: "border-blue-200 bg-blue-50/20",
-  }[issue.severity] ?? "border-border bg-card";
+  const severityBg = issue.severity === "critical" ? "border-red-200 bg-red-50/30"
+    : issue.severity === "warning" ? "border-amber-200 bg-amber-50/20"
+    : "border-blue-200 bg-blue-50/20";
 
   return (
     <div
@@ -205,7 +214,7 @@ export default function AnalysisDetail({ id }: { id: number }) {
       enabled: !!id,
       queryKey: getGetAnalysisQueryKey(id),
       refetchInterval: (query) => {
-        const status = (query.state.data as { status?: string } | undefined)?.status;
+        const status = (query.state.data as any)?.status;
         return status === "running" ? 2000 : false;
       },
     },
@@ -275,9 +284,6 @@ export default function AnalysisDetail({ id }: { id: number }) {
   const issues = (analysis.issues ?? []) as SeoIssue[];
   const recommendations = (analysis.recommendations ?? []) as Recommendation[];
   
-  // Derive page count from unique affected URLs
-  const pageCount = new Set(issues.map(i => i.affectedUrl).filter(Boolean)).size || 1;
-
   const criticalCount = issues.filter(i => i.severity === "critical").length;
   const warningCount = issues.filter(i => i.severity === "warning").length;
   const infoCount = issues.filter(i => i.severity === "info").length;
@@ -298,9 +304,10 @@ export default function AnalysisDetail({ id }: { id: number }) {
             <span className="text-sm capitalize">{analysis.type}</span>
             <span className="opacity-40">·</span>
             <span className="text-sm">{new Date(analysis.createdAt).toLocaleString()}</span>
-            {analysis.status === "running" && (
+            {(analysis.status === "running" || analysis.status === "queued") && (
               <span className="flex items-center gap-1 text-xs text-blue-600 font-medium">
-                <RefreshCw className="w-3 h-3 animate-spin" />Analyzing…
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                {analysis.status === "queued" ? "In Queue..." : "Analyzing..."}
               </span>
             )}
           </div>
@@ -308,7 +315,7 @@ export default function AnalysisDetail({ id }: { id: number }) {
         <Button
           variant="outline" size="sm" onClick={handleRerun}
           disabled={rerun.isPending || analysis.status === "running"}
-          className="gap-2 shrink-0" data-testid="button-rerun"
+          className="gap-2 shrink-0"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${rerun.isPending ? "animate-spin" : ""}`} />
           Re-run
@@ -319,7 +326,6 @@ export default function AnalysisDetail({ id }: { id: number }) {
           onClick={handleDelete}
           disabled={deleting}
           className="gap-2 shrink-0"
-          data-testid="button-delete"
         >
           {deleting
             ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -329,197 +335,180 @@ export default function AnalysisDetail({ id }: { id: number }) {
         </Button>
       </div>
 
-      {/* Score + Stats */}
-      <div className="grid md:grid-cols-3 gap-4">
-        {/* Score gauge */}
-        <div className="bg-card border border-border rounded-xl p-5 flex flex-col items-center justify-center">
-          <p className="text-sm font-medium text-muted-foreground mb-2">SEO Score</p>
+      {/* Main Score Gauge */}
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="bg-card border border-border rounded-xl p-6 flex flex-col items-center justify-center relative overflow-hidden">
+          <div className="absolute top-4 left-4 flex items-center gap-2">
+            <Activity className="w-4 h-4 text-primary" />
+            <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">SEO Audit Score</span>
+          </div>
+          
           {analysis.seoScore != null ? (
-            <>
-              <div className="relative w-32 h-32">
+            <div className="mt-4 flex flex-col items-center">
+              <div className="relative w-40 h-40">
                 <ResponsiveContainer width="100%" height="100%">
-                  <RadialBarChart innerRadius="70%" outerRadius="100%" data={scoreData} startAngle={90} endAngle={-270}>
-                    <RadialBar dataKey="value" cornerRadius={6} background={{ fill: "hsl(214 32% 91%)" }} />
+                  <RadialBarChart innerRadius="75%" outerRadius="100%" data={scoreData} startAngle={90} endAngle={-270}>
+                    <RadialBar dataKey="value" cornerRadius={8} background={{ fill: "hsl(var(--muted))" }} />
                   </RadialBarChart>
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-extrabold" style={{ color: scoreColor }}>{analysis.seoScore}</span>
+                  <span className="text-4xl font-black tracking-tighter" style={{ color: scoreColor }}>{analysis.seoScore}</span>
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Score</span>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">out of 100</p>
-              <span className="mt-2 text-xs font-semibold px-2.5 py-0.5 rounded-full" style={{ background: `${scoreColor}20`, color: scoreColor }}>{scoreLabel}</span>
-            </>
+              <div className="mt-4 flex flex-col items-center">
+                <span className="text-sm font-bold px-4 py-1 rounded-full border transition-all shadow-sm" style={{ backgroundColor: `${scoreColor}15`, color: scoreColor, borderColor: `${scoreColor}30` }}>
+                  {scoreLabel}
+                </span>
+                <p className="text-xs text-muted-foreground mt-2 text-center max-w-[200px]">
+                  Based on content depth, meta tags, and accessibility standards.
+                </p>
+              </div>
+            </div>
           ) : (
-            <div className="flex flex-col items-center gap-3 py-4">
-              <div className="w-16 h-16 rounded-full border-4 border-blue-200 border-t-blue-500 animate-spin" />
-              <p className="text-sm text-muted-foreground">
-                {analysis.status === "running" ? "Analyzing page…" : "Pending"}
+            <div className="flex flex-col items-center gap-4 py-8">
+              <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+              <p className="text-sm font-medium text-muted-foreground animate-pulse">
+                {analysis.status === "queued" ? "Waiting in Queue..." : "Generating Detailed Audit..."}
               </p>
-              {analysis.status === "running" && (
-                <button onClick={() => refetch()} className="text-xs text-primary hover:underline">
-                  Check for results
-                </button>
-              )}
             </div>
           )}
         </div>
 
-        {/* Issue summary */}
-        <div className="bg-card border border-border rounded-xl p-5">
-          <p className="text-sm font-medium text-muted-foreground mb-4">Issue Summary</p>
+        {/* Lighthouse Core Metrics */}
+        <div className="grid grid-cols-2 gap-4">
+           <ScoreCard label="Performance" score={analysis.performanceScore ?? null} icon={Zap} />
+           <ScoreCard label="Accessibility" score={analysis.accessibilityScore ?? null} icon={AccessibilityIcon} />
+           <ScoreCard label="Best Practices" score={analysis.bestPracticesScore ?? null} icon={ShieldCheck} />
+           <ScoreCard label="Mobile" score={analysis.mobileScore ?? null} icon={Globe} />
+        </div>
+      </div>
+
+      {/* Web Vitals & Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-card border border-border rounded-xl p-4">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Core Web Vitals</p>
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2 text-sm font-medium text-red-600">
-                <XCircle className="w-4 h-4" />Critical
-              </span>
-              <div className="flex items-center gap-2">
-                <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-red-500 rounded-full" style={{ width: `${Math.min(100, criticalCount * 25)}%` }} />
-                </div>
-                <span className="font-bold text-red-600 w-4 text-right">{criticalCount}</span>
-              </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">LCP (Paint)</span>
+              <span className="font-mono font-bold text-primary">{analysis.lcp || "—"}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2 text-sm font-medium text-amber-600">
-                <AlertTriangle className="w-4 h-4" />Warnings
-              </span>
-              <div className="flex items-center gap-2">
-                <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-amber-400 rounded-full" style={{ width: `${Math.min(100, warningCount * 15)}%` }} />
-                </div>
-                <span className="font-bold text-amber-600 w-4 text-right">{warningCount}</span>
-              </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">CLS (Shift)</span>
+              <span className="font-mono font-bold text-primary">{analysis.cls || "—"}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2 text-sm font-medium text-blue-600">
-                <Info className="w-4 h-4" />Info
-              </span>
-              <div className="flex items-center gap-2">
-                <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-400 rounded-full" style={{ width: `${Math.min(100, infoCount * 15)}%` }} />
-                </div>
-                <span className="font-bold text-blue-600 w-4 text-right">{infoCount}</span>
-              </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">FCP (First)</span>
+              <span className="font-mono font-bold text-primary">{analysis.fcp || "—"}</span>
             </div>
           </div>
         </div>
 
-        {/* Page metrics */}
-        {analysis.type === "website" && (
-          <div className="bg-card border border-border rounded-xl p-5">
-            <p className="text-sm font-medium text-muted-foreground mb-3">Page Metrics</p>
-            <div className="space-y-2.5">
-              {([
-                ["Word Count", analysis.wordCount?.toLocaleString()],
-                ["Pages Analyzed", pageCount],
-                ["Internal Links", analysis.internalLinks],
-                ["External Links", analysis.externalLinks],
-                ["H1 Tags", analysis.h1Count],
-                ["H2 Tags", analysis.h2Count],
-                ["Images w/o Alt", analysis.imagesMissingAlt],
-                ["Page Speed", analysis.pageLoadScore ? `${analysis.pageLoadScore}/100` : null],
-                ["Mobile Score", analysis.mobileScore ? `${analysis.mobileScore}/100` : null],
-              ] as [string, string | number | null | undefined][]).map(([label, val]) => (
-                <div key={String(label)} className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{label}</span>
-                  <span className={`font-semibold ${
-                    label === "Images w/o Alt" && Number(val) > 0 ? "text-amber-600" : "text-foreground"
-                  }`}>{val ?? "—"}</span>
-                </div>
-              ))}
+        <div className="bg-card border border-border rounded-xl p-4">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Content Depth</p>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Words</span>
+              <span className="font-bold">{analysis.wordCount?.toLocaleString() || "—"}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">H1 Tags</span>
+              <span className={`font-bold ${analysis.h1Count !== 1 ? "text-amber-600" : "text-emerald-600"}`}>{analysis.h1Count ?? "—"}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">H2 Tags</span>
+              <span className="font-bold">{analysis.h2Count ?? "—"}</span>
             </div>
           </div>
-        )}
+        </div>
+
+        <div className="bg-card border border-border rounded-xl p-4">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Health Status</p>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-red-500 font-bold">Critical</span>
+              <Badge variant="destructive" className="h-5 px-1.5">{criticalCount}</Badge>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-amber-500 font-bold">Warnings</span>
+              <Badge variant="outline" className="h-5 px-1.5 border-amber-200 text-amber-600">{warningCount}</Badge>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-blue-500 font-bold">Info</span>
+              <Badge variant="outline" className="h-5 px-1.5 border-blue-200 text-blue-600">{infoCount}</Badge>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Meta info */}
-      {analysis.type === "website" && (analysis.metaTitle || analysis.metaDescription) && (
-        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-          <h2 className="font-semibold text-foreground flex items-center gap-2">
+      {(analysis.metaTitle || analysis.metaDescription) && (
+        <div className="bg-card border border-border rounded-xl p-6 space-y-5 shadow-sm">
+          <h2 className="text-sm font-bold text-foreground flex items-center gap-2 uppercase tracking-widest">
             <Code className="w-4 h-4 text-primary" />
-            Meta Information (from live page)
+            Meta Data (Live Page)
           </h2>
           {analysis.metaTitle && (
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Title Tag</p>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Title Tag</p>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                   analysis.metaTitle.length >= 30 && analysis.metaTitle.length <= 60
                     ? "bg-emerald-100 text-emerald-700"
                     : "bg-amber-100 text-amber-700"
                 }`}>{analysis.metaTitle.length} chars</span>
               </div>
-              <p className="text-sm text-foreground bg-zinc-950 text-zinc-100 rounded-lg px-3 py-2.5 font-mono">&lt;title&gt;{analysis.metaTitle}&lt;/title&gt;</p>
-              <div className="mt-1.5 flex items-center gap-1">
-                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      analysis.metaTitle.length > 60 ? "bg-red-500" : analysis.metaTitle.length < 30 ? "bg-amber-400" : "bg-emerald-500"
-                    }`}
-                    style={{ width: `${Math.min(100, (analysis.metaTitle.length / 60) * 100)}%` }}
-                  />
-                </div>
-                <span className="text-xs text-muted-foreground">60 char limit</span>
-              </div>
+              <p className="text-sm text-foreground bg-zinc-950 text-zinc-100 rounded-lg px-4 py-3 font-mono border border-zinc-800 shadow-inner overflow-hidden">&lt;title&gt;{analysis.metaTitle}&lt;/title&gt;</p>
             </div>
           )}
           {analysis.metaDescription && (
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Meta Description</p>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Meta Description</p>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                   analysis.metaDescription.length >= 120 && analysis.metaDescription.length <= 160
                     ? "bg-emerald-100 text-emerald-700"
                     : "bg-amber-100 text-amber-700"
                 }`}>{analysis.metaDescription.length} chars</span>
               </div>
-              <p className="text-sm text-foreground bg-zinc-950 text-zinc-100 rounded-lg px-3 py-2.5 font-mono">&lt;meta name="description" content="{analysis.metaDescription}"&gt;</p>
-              <div className="mt-1.5 flex items-center gap-1">
-                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      analysis.metaDescription.length > 160 ? "bg-red-500" : analysis.metaDescription.length < 120 ? "bg-amber-400" : "bg-emerald-500"
-                    }`}
-                    style={{ width: `${Math.min(100, (analysis.metaDescription.length / 160) * 100)}%` }}
-                  />
-                </div>
-                <span className="text-xs text-muted-foreground">160 char limit</span>
-              </div>
+              <p className="text-sm text-foreground bg-zinc-950 text-zinc-100 rounded-lg px-4 py-3 font-mono border border-zinc-800 shadow-inner overflow-hidden">&lt;meta name="description" content="{analysis.metaDescription}"&gt;</p>
             </div>
           )}
         </div>
       )}
 
-      {/* Issues + Recommendations tabs */}
-      <Tabs defaultValue="issues">
-        <TabsList>
-          <TabsTrigger value="issues">
-            Issues
+      {/* Tabs */}
+      <Tabs defaultValue="issues" className="w-full">
+        <TabsList className="bg-muted/50 p-1">
+          <TabsTrigger value="issues" className="data-[state=active]:bg-card data-[state=active]:shadow-sm">
+            Analysis Issues
             {issues.length > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold bg-destructive/20 text-destructive">{issues.length}</span>
+              <Badge variant="destructive" className="ml-2 px-1.5 h-5 min-w-[20px] justify-center">{issues.length}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="recommendations">
+          <TabsTrigger value="recommendations" className="data-[state=active]:bg-card data-[state=active]:shadow-sm">
             Recommendations
             {recommendations.length > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold bg-primary/20 text-primary">{recommendations.length}</span>
+              <Badge className="ml-2 px-1.5 h-5 min-w-[20px] justify-center bg-primary/20 text-primary hover:bg-primary/20">{recommendations.length}</Badge>
             )}
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="issues" className="mt-4 space-y-3">
+        <TabsContent value="issues" className="mt-6 space-y-4">
           {issues.length === 0 ? (
-            <div className="text-center py-12 bg-card rounded-xl border border-border">
-              <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
-              <p className="font-semibold text-foreground mb-1">No issues found</p>
-              <p className="text-sm text-muted-foreground">This page is well-optimized. Keep up the great work!</p>
+            <div className="text-center py-20 bg-card rounded-2xl border-2 border-dashed border-border">
+              <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-4 opacity-50" />
+              <p className="font-bold text-foreground">Perfect Optimization</p>
+              <p className="text-sm text-muted-foreground">No critical issues or warnings detected on this page.</p>
             </div>
           ) : (
             <>
-              <p className="text-xs text-muted-foreground">
-                Click any issue card to see the <strong>exact element</strong>, <strong>line number</strong>, and <strong>fix examples</strong>.
-              </p>
-              {/* Sort: critical first, then warning, then info */}
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl mb-4">
+                <Info className="w-4 h-4 text-blue-500" />
+                <p className="text-xs text-blue-700 font-medium">
+                  Click cards to view <strong>source code</strong>, <strong>line numbers</strong>, and <strong>fix tutorials</strong>.
+                </p>
+              </div>
               {[...issues]
                 .sort((a, b) => {
                   const order = { critical: 0, warning: 1, info: 2 };
@@ -531,20 +520,24 @@ export default function AnalysisDetail({ id }: { id: number }) {
           )}
         </TabsContent>
 
-        <TabsContent value="recommendations" className="mt-4 space-y-3">
+        <TabsContent value="recommendations" className="mt-6 space-y-4">
           {recommendations.length === 0 ? (
-            <div className="text-center py-12 bg-card rounded-xl border border-border text-muted-foreground text-sm">
-              No recommendations available.
+            <div className="text-center py-20 bg-card rounded-2xl border border-border">
+              <p className="text-sm text-muted-foreground">No specific recommendations at this time.</p>
             </div>
           ) : (
             <>
-              <p className="text-xs text-muted-foreground">
-                Sorted by priority. Each recommendation includes the specific tags and code you should add or change.
-              </p>
+              <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-100 rounded-xl mb-4">
+                <Zap className="w-4 h-4 text-emerald-600" />
+                <p className="text-xs text-emerald-700 font-medium">
+                  Recommendations are sorted by <strong>Estimated SEO Impact</strong>.
+                </p>
+              </div>
               {[...recommendations]
                 .sort((a, b) => {
                   const order = { high: 0, medium: 1, low: 2 };
-                  return (order[a.priority as keyof typeof order] ?? 9) - (order[b.priority as keyof typeof order] ?? 9);
+                  const priorityDiff = (order[a.priority as keyof typeof order] ?? 9) - (order[b.priority as keyof typeof order] ?? 9);
+                  return priorityDiff || (b.estimatedImpact - a.estimatedImpact);
                 })
                 .map((rec) => <RecommendationCard key={rec.id} rec={rec} />)
               }

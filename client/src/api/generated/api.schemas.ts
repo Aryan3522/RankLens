@@ -42,6 +42,7 @@ export type AnalysisStatus =
 
 export const AnalysisStatus = {
   pending: "pending",
+  queued: "queued",
   running: "running",
   completed: "completed",
   failed: "failed",
@@ -93,6 +94,7 @@ export type AnalysisDetailStatus =
 
 export const AnalysisDetailStatus = {
   pending: "pending",
+  queued: "queued",
   running: "running",
   completed: "completed",
   failed: "failed",
@@ -157,6 +159,12 @@ export interface AnalysisDetail {
   /** @nullable */
   seoScore?: number | null;
   /** @nullable */
+  performanceScore?: number | null;
+  /** @nullable */
+  accessibilityScore?: number | null;
+  /** @nullable */
+  bestPracticesScore?: number | null;
+  /** @nullable */
   issueCount?: number | null;
   /** @nullable */
   metaTitle?: string | null;
@@ -178,6 +186,14 @@ export interface AnalysisDetail {
   pageLoadScore?: number | null;
   /** @nullable */
   mobileScore?: number | null;
+  /** @nullable */
+  pageCount?: number | null;
+  /** @nullable */
+  lcp?: string | null;
+  /** @nullable */
+  cls?: string | null;
+  /** @nullable */
+  fcp?: string | null;
   issues: SeoIssue[];
   recommendations: Recommendation[];
   createdAt: string;
