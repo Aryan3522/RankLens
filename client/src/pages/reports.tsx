@@ -32,7 +32,7 @@ export default function Reports() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const handleDismiss = (id: number) => {
+  const handleDismiss = (id: string) => {
     dismiss.mutate({ id }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListRecommendationsQueryKey() });

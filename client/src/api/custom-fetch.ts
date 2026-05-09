@@ -363,7 +363,7 @@ export async function customFetch<T = unknown>(
     ...init, 
     method, 
     headers,
-    credentials: init.credentials || "include" 
+    credentials: init.credentials || "omit" 
   });
 
   if (!response.ok) {

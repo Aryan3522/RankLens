@@ -44,7 +44,7 @@ export default function Projects() {
     );
   };
 
-  const handleDelete = (e: React.MouseEvent, id: number) => {
+  const handleDelete = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     if (!confirm("Delete this project?")) return;
     deleteProject.mutate({ id }, {

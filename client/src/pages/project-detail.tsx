@@ -28,7 +28,7 @@ function TrendIcon({ trend }: { trend: string | null | undefined }) {
   return <Minus className="w-3.5 h-3.5 text-muted-foreground" />;
 }
 
-export default function ProjectDetail({ id }: { id: number }) {
+export default function ProjectDetail({ id }: { id: string }) {
   const { data: project, isLoading: projLoading } = useGetProject(id, { query: { enabled: !!id, queryKey: getGetProjectQueryKey(id) } });
   const { data: analyses, isLoading: anLoading } = useListAnalyses({ projectId: id }, { query: { enabled: !!id, queryKey: getListAnalysesQueryKey({ projectId: id }) } });
   const { data: keywords, isLoading: kwLoading } = useListKeywords({ projectId: id }, { query: { enabled: !!id, queryKey: getListKeywordsQueryKey({ projectId: id }) } });

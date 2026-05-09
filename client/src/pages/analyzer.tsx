@@ -1,9 +1,8 @@
 import { useState } from "react";
 import {
   useCreateAnalysis, useListAnalyses, useListProjects,
-  getListAnalysesQueryKey,
+  getListAnalysesQueryKey, useDeleteAnalysis
 } from "@/api";
-import { customFetch } from "@/api/custom-fetch";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
@@ -19,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 
 type AnalysisType = "website" | "youtube" | "instagram";
 
-const tabs: { type: AnalysisType; label: string; icon: React.ElementType; placeholder: string }[] = [
+const ANALYSIS_TABS: { type: AnalysisType; label: string; icon: any; placeholder: string }[] = [
   { type: "website",   label: "Website",   icon: Globe,      placeholder: "https://example.com" },
   { type: "youtube",   label: "YouTube",   icon: Youtube,    placeholder: "https://youtube.com/watch?v=..." },
   { type: "instagram", label: "Instagram", icon: Instagram,  placeholder: "https://instagram.com/p/..." },
@@ -36,73 +35,76 @@ function StatusIcon({ status }: { status: string }) {
 export default function Analyzer() {
   const [url, setUrl]           = useState("");
   const [type, setType]         = useState<AnalysisType>("website");
-  const [projectId, setProjectId] = useState<string>("");
-  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
-  const [deleting, setDeleting] = useState<number | null>(null);
+  const [projectId, setProjectId] = useState<string>("none");
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const { data: analyses, isLoading } = useListAnalyses();
   const { data: projects } = useListProjects();
   const createAnalysis = useCreateAnalysis();
+  const deleteAnalysis = useDeleteAnalysis();
   const queryClient    = useQueryClient();
   const { toast }      = useToast();
   const [, navigate]   = useLocation();
 
-  const activeTab = tabs.find(t => t.type === type)!;
+  // Find active tab safely
+  const activeTab = ANALYSIS_TABS.find(t => t.type === type) || ANALYSIS_TABS[0];
 
   const handleSubmit = () => {
     if (!url.trim()) return;
+    
     createAnalysis.mutate(
-      { data: { url: url.trim(), type, projectId: projectId && projectId !== "none" ? Number(projectId) : null } },
+      { data: { url: url.trim(), type, projectId: projectId && projectId !== "none" ? projectId : null } },
       {
         onSuccess: (data: any) => {
           queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
           setUrl("");
-          const msg = data.queuePosition > 0 
-            ? `Analyzing ${data.url} (Position in queue: ${data.queuePosition})`
-            : `Analyzing ${data.url}`;
+          const msg = data?.url ? `Analyzing ${data.url}` : "Analysis started";
           toast({ title: "Analysis started", description: msg });
-          setTimeout(() => queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() }), 2000);
+          
+          // Re-fetch after short delay to catch progress
+          setTimeout(() => {
+             queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
+          }, 2000);
         },
         onError: (err: any) => {
-          if (err.status === 429) {
-            toast({ 
-              title: "Rate Limited", 
-              description: err.data?.error || "Too many requests. Please try again later.", 
-              variant: "destructive" 
-            });
-          } else {
-            toast({ title: "Error", description: "Failed to start analysis", variant: "destructive" });
-          }
+          toast({ 
+            title: "Error", 
+            description: err?.data?.error || "Failed to start analysis", 
+            variant: "destructive" 
+          });
         },
       }
     );
   };
 
-  const handleDelete = async (id: number, e: React.MouseEvent) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
     if (confirmDelete !== id) {
       setConfirmDelete(id);
-      // auto-reset confirm after 3s
       setTimeout(() => setConfirmDelete(prev => prev === id ? null : prev), 3000);
       return;
     }
 
     setDeleting(id);
-    setConfirmDelete(null);
-    try {
-      await customFetch(`/api/analyses/${id}`, { method: "DELETE" });
-      queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
-      toast({ title: "Deleted", description: "Analysis removed." });
-    } catch {
-      toast({ title: "Error", description: "Could not delete analysis.", variant: "destructive" });
-    } finally {
-      setDeleting(null);
-    }
+    deleteAnalysis.mutate({ id }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
+        toast({ title: "Deleted", description: "Analysis removed." });
+        setDeleting(null);
+        setConfirmDelete(null);
+      },
+      onError: () => {
+        toast({ title: "Error", description: "Could not delete analysis.", variant: "destructive" });
+        setDeleting(null);
+        setConfirmDelete(null);
+      }
+    });
   };
 
-  const sorted = analyses ? [...analyses].reverse() : [];
+  const sorted = Array.isArray(analyses) ? [...analyses].reverse() : [];
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -112,16 +114,15 @@ export default function Analyzer() {
       </div>
 
       {/* Type selector + form */}
-      <div className="bg-card border border-border rounded-xl p-6 space-y-5">
+      <div className="bg-card border border-border rounded-xl p-6 space-y-5 shadow-sm">
         <div className="flex flex-wrap gap-2">
-          {tabs.map(({ type: t, label, icon: Icon }) => (
+          {ANALYSIS_TABS.map(({ type: t, label, icon: Icon }) => (
             <button
               key={t}
               onClick={() => setType(t)}
-              data-testid={`tab-type-${t}`}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 type === t
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground shadow-sm"
                   : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
               }`}
             >
@@ -131,10 +132,10 @@ export default function Analyzer() {
           ))}
         </div>
 
-        <div className="space-y-3">
-          <div>
+        <div className="space-y-4">
+          <div className="space-y-2">
             <Label htmlFor="url-input">URL to analyze</Label>
-            <div className="flex gap-2 mt-1.5">
+            <div className="flex gap-2">
               <Input
                 id="url-input"
                 value={url}
@@ -142,30 +143,32 @@ export default function Analyzer() {
                 onKeyDown={e => e.key === "Enter" && handleSubmit()}
                 placeholder={activeTab.placeholder}
                 className="flex-1"
-                data-testid="input-url"
               />
               <Button
                 onClick={handleSubmit}
                 disabled={createAnalysis.isPending || !url.trim()}
-                className="gap-2 shrink-0"
-                data-testid="button-analyze"
+                className="gap-2 shrink-0 min-w-[100px]"
               >
-                <Search className="w-4 h-4" />
-                {createAnalysis.isPending ? "Analyzing…" : "Analyze"}
+                {createAnalysis.isPending ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+                {createAnalysis.isPending ? "Analyzing..." : "Analyze"}
               </Button>
             </div>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="project-select">Assign to project (optional)</Label>
             <Select value={projectId} onValueChange={setProjectId}>
-              <SelectTrigger id="project-select" className="mt-1.5 w-64" data-testid="select-project">
+              <SelectTrigger id="project-select" className="w-full md:w-72">
                 <SelectValue placeholder="No project" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">No project</SelectItem>
-                {projects?.map(p => (
-                  <SelectItem key={p.id} value={String(p.id)} data-testid={`option-project-${p.id}`}>
+                {Array.isArray(projects) && projects.map(p => (
+                  <SelectItem key={p.id} value={String(p.id)}>
                     {p.name}
                   </SelectItem>
                 ))}
@@ -176,52 +179,53 @@ export default function Analyzer() {
       </div>
 
       {/* Recent analyses */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
           <h2 className="font-semibold text-foreground">Recent Analyses</h2>
           {sorted.length > 0 && (
-            <span className="text-xs text-muted-foreground">{sorted.length} total</span>
+            <span className="text-xs text-muted-foreground font-medium px-2 py-1 bg-muted rounded-full">
+              {sorted.length} total
+            </span>
           )}
         </div>
 
         {isLoading ? (
           <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
+            {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
           </div>
         ) : sorted.length > 0 ? (
           <div className="space-y-2">
             {sorted.map((an) => (
-              <div key={an.id} className="group relative" data-testid={`row-analysis-${an.id}`}>
+              <div key={an.id} className="group relative">
                 <Link href={`/analyses/${an.id}`}>
-                  <div className="flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-3.5 hover:shadow-sm hover:border-primary/30 transition-all cursor-pointer pr-24">
+                  <div className="flex items-center gap-4 bg-card border border-border rounded-xl px-5 py-4 hover:shadow-md hover:border-primary/20 transition-all cursor-pointer pr-24">
                     <StatusIcon status={an.status} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{an.url}</p>
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {an.type} · {new Date(an.createdAt).toLocaleString()}
-                        {an.status === "queued" && <span className="ml-2 text-amber-600 font-bold animate-pulse">In Queue</span>}
+                      <p className="text-sm font-bold text-foreground truncate">{an.url}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 uppercase tracking-wider font-semibold">
+                        {an.type} · {new Date(an.createdAt).toLocaleDateString()}
+                        {an.status === "queued" && <span className="ml-2 text-amber-600 animate-pulse">In Queue</span>}
                       </p>
                     </div>
                     {an.seoScore != null && (
-                      <span className={`text-sm font-bold shrink-0 ${
-                        an.seoScore >= 80 ? "text-emerald-600" : an.seoScore >= 60 ? "text-amber-600" : "text-red-600"
-                      }`}>
-                        {an.seoScore}/100
-                      </span>
+                      <div className="text-right shrink-0">
+                        <p className={`text-lg font-black ${
+                          an.seoScore >= 80 ? "text-emerald-600" : an.seoScore >= 60 ? "text-amber-600" : "text-red-600"
+                        }`}>
+                          {an.seoScore}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase">Score</p>
+                      </div>
                     )}
-                    {an.issueCount != null && (
-                      <span className="text-xs text-muted-foreground shrink-0">{an.issueCount} issues</span>
-                    )}
-                    <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0 ml-2" />
                   </div>
                 </Link>
 
-                {/* Delete button — floated right, outside the Link */}
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
                   {confirmDelete === an.id ? (
                     <button
                       onClick={(e) => handleDelete(an.id, e)}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 px-2.5 py-1 rounded-lg transition-colors"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 px-2.5 py-1 rounded-lg transition-colors shadow-sm"
                       title="Click to confirm deletion"
                     >
                       {deleting === an.id ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
@@ -231,7 +235,7 @@ export default function Analyzer() {
                     <button
                       onClick={(e) => handleDelete(an.id, e)}
                       disabled={deleting === an.id}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-all focus:opacity-100"
                       title="Delete this analysis"
                     >
                       {deleting === an.id
@@ -245,10 +249,12 @@ export default function Analyzer() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-16 bg-card rounded-xl border border-border">
-            <Search className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-            <h3 className="font-semibold text-foreground mb-1">No analyses yet</h3>
-            <p className="text-sm text-muted-foreground">Submit a URL above to run your first SEO analysis.</p>
+          <div className="text-center py-20 bg-card rounded-2xl border-2 border-dashed border-border">
+            <Search className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+            <h3 className="font-bold text-foreground mb-1">No analyses yet</h3>
+            <p className="text-sm text-muted-foreground max-w-[250px] mx-auto leading-relaxed">
+              Enter a URL above and click Analyze to generate your first SEO audit report.
+            </p>
           </div>
         )}
       </div>
