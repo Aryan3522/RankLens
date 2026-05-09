@@ -19,7 +19,7 @@ const app: Express = express();
 // Parse and normalize allowed origins from environment
 const clientUrls = (env.CLIENT_URL || "")
   .split(",")
-  .map((url: string) => url.trim().replace(/\/$/, ""))
+  .map((url: string) => url.trim().replace(/\/$/, "")) // Remove trailing slashes
   .filter(Boolean);
 
 const allowedOrigins = [...new Set([...clientUrls, "https://rank-lens-delta.vercel.app"])];
