@@ -1,5 +1,5 @@
 import lighthouse from "lighthouse";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
 
 import { logger } from "./logger.js";
 
@@ -44,10 +44,15 @@ export async function runLighthouseAudit(
 
   try {
     // ======================================================
-    // LAUNCH BROWSER
+    // LAUNCH CHROMIUM
     // ======================================================
 
     browser = await puppeteer.launch({
+      executablePath:
+        process.env
+          .PUPPETEER_EXECUTABLE_PATH ||
+        "/usr/bin/chromium",
+
       headless: true,
 
       args: [
@@ -66,7 +71,7 @@ export async function runLighthouseAudit(
     );
 
     // ======================================================
-    // LIGHTHOUSE
+    // RUN LIGHTHOUSE
     // ======================================================
 
     const runnerResult =
