@@ -2,11 +2,11 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
+import cookieParser from "cookie-parser";
 import { pinoHttp } from "pino-http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import passport from "./lib/auth/passport.js";
-import jwt from "jsonwebtoken";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { pool } from "./db/index.js";
@@ -15,45 +15,80 @@ import { generalRateLimiter } from "./lib/concurrency.js";
 
 const app: Express = express();
 
-// --- 1. CORS (ABSOLUTE TOP) ---
+// --- 1. CORS Configuration (ABSOLUTE TOP) ---
 // Parse and normalize allowed origins from environment
 const clientUrls = (env.CLIENT_URL || "")
   .split(",")
   .map((url: string) => url.trim().replace(/\/$/, "")) // Remove trailing slashes
   .filter(Boolean);
 
-const allowedOrigins = [...new Set([...clientUrls, "https://rank-lens-delta.vercel.app"])];
+// Define comprehensive list of allowed origins
+const allowedOrigins = [
+  ...new Set([
+    ...clientUrls,
+    "https://rank-lens-delta.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:4173", // Vite preview
+  ]),
+];
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps) OR matched origins
-      // We check for exact match OR match without trailing slash
-      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
-        callback(null, true);
-      } else {
-        logger.warn({ origin, allowed: allowedOrigins }, "CORS blocked origin");
-        callback(null, false);
-      }
-    },
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization", "Accept", "X-Requested-With", "X-CSRF-Token"],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    preflightContinue: false,
-    optionsSuccessStatus: 204, // Use 204 for OPTIONS pre-flight success
-  }),
-);
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    // Normalize origin for comparison
+    const normalizedOrigin = origin.replace(/\/$/, "");
+    
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      callback(null, true);
+    } else {
+      logger.warn({ origin, allowed: allowedOrigins }, "CORS blocked origin");
+      // In production, we don't want to fail the request here, but rather 
+      // not set the Access-Control-Allow-Origin header. 
+      // However, for preflight to work correctly, we must be careful.
+      callback(null, false);
+    }
+  },
+  credentials: true,
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "Accept",
+    "X-Requested-With",
+    "X-CSRF-Token",
+    "Access-Control-Allow-Origin", // Some clients send this
+  ],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+};
+
+// Apply CORS middleware
+app.use(cors(corsOptions));
+
+// Explicitly handle OPTIONS preflight for all routes
+app.options("*", cors(corsOptions));
 
 const PostgresStore = connectPgSimple(session);
 
 // --- 2. Security & Performance ---
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-})); 
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    // Adjust Content Security Policy for cross-domain usage if needed
+    contentSecurityPolicy: false, 
+  })
+);
 app.use(compression());
-app.set("trust proxy", 1); 
+app.set("trust proxy", 1); // Required for Vercel/proxies
 
-// --- 3. Logging & Parsers ---
+// --- 3. Parsers & Logging ---
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser(env.SESSION_SECRET)); // Added cookie-parser with secret
+
 app.use(
   pinoHttp({
     logger,
@@ -65,11 +100,8 @@ app.use(
         origin: req.headers.origin,
       }),
     },
-  }),
+  })
 );
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 // --- 4. Health Check ---
 app.get("/api/health", (req, res) => {
@@ -102,8 +134,8 @@ app.use(
     cookie: {
       maxAge: 60 * 24 * 60 * 60 * 1000, // 60 days
       httpOnly: true,
-      secure: isProd, // Requires HTTPS in production
-      sameSite: isProd ? "none" : "lax", // 'none' for cross-origin
+      secure: true, // ALWAYS true for cross-origin SameSite: None
+      sameSite: "none", // REQUIRED for cross-domain cookies on Vercel
       path: "/",
     },
   })
@@ -140,25 +172,26 @@ app.get("/api/ping", (req, res) => {
   });
 });
 
-// --- 6. Global Error Handler (With CORS Fail-safe) ---
+// --- 6. Global Error Handler ---
 app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal Server Error";
   
   logger.error({ err, status, message }, "Unhandled Application Error");
   
-  // MANUALLY set CORS headers for error responses as a final fail-safe
+  // Ensure CORS headers are present even on errors
   const origin = req.headers.origin;
-  if (origin && (allowedOrigins.includes(origin) || allowedOrigins.includes(origin.replace(/\/$/, "")))) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, X-Requested-With, X-CSRF-Token");
+  if (origin) {
+    const normalizedOrigin = origin.replace(/\/$/, "");
+    if (allowedOrigins.includes(normalizedOrigin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+    }
   }
   
   res.status(status).json({
-    error: process.env.NODE_ENV === "production" ? "Internal Server Error" : message,
-    debug: process.env.NODE_ENV === "production" ? undefined : err.stack,
+    error: isProd ? "Internal Server Error" : message,
+    debug: isProd ? undefined : err.stack,
   });
 });
 
