@@ -1,62 +1,87 @@
 import "dotenv/config";
 
-import { env } from "./lib/env.js";
 import app from "./app.js";
+import { env } from "./lib/env.js";
 import { logger } from "./lib/logger.js";
 
 const port = Number(env.PORT) || 3000;
 
-// ======================================================
-// PROCESS HANDLERS
-// ======================================================
+/**
+ * ======================================================
+ * PROCESS ERROR HANDLERS
+ * ======================================================
+ */
 
-process.on("unhandledRejection", (reason, promise) => {
+process.on("unhandledRejection", (reason) => {
   logger.error(
     {
-      promise,
-      reason,
+      error: reason,
     },
-    "Unhandled Rejection"
+    "Unhandled Promise Rejection",
   );
 });
 
-process.on("uncaughtException", (err) => {
-  logger.error(
+process.on("uncaughtException", (error) => {
+  logger.fatal(
     {
-      err,
+      error,
     },
-    "Uncaught Exception"
+    "Uncaught Exception",
   );
 
   process.exit(1);
 });
 
-// ======================================================
-// START SERVER
-// ======================================================
+/**
+ * ======================================================
+ * START SERVER
+ * ======================================================
+ */
 
-if (env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
-  app.listen(port, "0.0.0.0", (err?: Error | null) => {
-    if (err) {
-      logger.error(
-        {
-          err,
-        },
-        "Error starting server"
-      );
+const server = app.listen(port, "0.0.0.0", () => {
+  logger.info(
+    {
+      port,
+      env: env.NODE_ENV,
+      nodeVersion: process.version,
+    },
+    "Server running",
+  );
+});
 
-      process.exit(1);
-    }
+/**
+ * ======================================================
+ * GRACEFUL SHUTDOWN
+ * ======================================================
+ */
 
-    logger.info(
-      {
-        port,
-        env: env.NODE_ENV || "development",
-        nodeVersion: process.version,
-      },
-      "Server running"
-    );
+const shutdown = (signal: string) => {
+  logger.warn(
+    {
+      signal,
+    },
+    "Graceful shutdown initiated",
+  );
+
+  server.close(() => {
+    logger.info("HTTP server closed");
+
+    process.exit(0);
   });
-}
+
+  // FORCE EXIT AFTER TIMEOUT
+
+  setTimeout(() => {
+    logger.error(
+      "Forced shutdown after timeout",
+    );
+
+    process.exit(1);
+  }, 10000).unref();
+};
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 export default app;
