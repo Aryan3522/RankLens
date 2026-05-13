@@ -7,6 +7,11 @@ import {
   type LighthouseAuditResult,
 } from "./lighthouse-service.js";
 
+import {
+  analyzeAiVisibility,
+  type AiVisibilityResult,
+} from "./ai-visibility-analyzer.js";
+
 interface IssueDetail {
   category: string;
 
@@ -91,6 +96,14 @@ export interface SeoAnalysisResult {
   issues: IssueDetail[];
 
   recommendations: RecommendationDetail[];
+
+  aiVisibilityScore?: number;
+
+  aiVisibilityInsights?: {
+    strengths: string[];
+    weaknesses: string[];
+    recommendations: string[];
+  };
 }
 
 async function fetchPage(
@@ -305,6 +318,14 @@ async function analyzePage(
           dismissed: false,
         },
       ],
+
+      aiVisibilityScore: 0,
+
+      aiVisibilityInsights: {
+        strengths: [],
+        weaknesses: ["Page could not be fetched for AI visibility analysis"],
+        recommendations: ["Ensure the page is publicly accessible for AI crawlers"],
+      },
     };
   }
 
@@ -576,6 +597,13 @@ async function analyzePage(
     issues,
 
     recommendations,
+
+    ...analyzeAiVisibility(
+      $,
+      finalUrl,
+      lighthouseResult.performanceScore,
+      lighthouseResult.performanceScore,
+    ),
   };
 }
 
@@ -628,6 +656,14 @@ async function analyzeYouTube(
     issues: [],
 
     recommendations: [],
+
+    aiVisibilityScore: 60,
+
+    aiVisibilityInsights: {
+      strengths: ["YouTube content is inherently indexed by AI systems"],
+      weaknesses: ["Limited control over YouTube page structure"],
+      recommendations: ["Optimize video descriptions and tags for AI discoverability"],
+    },
   };
 }
 
@@ -680,5 +716,13 @@ async function analyzeInstagram(
     issues: [],
 
     recommendations: [],
+
+    aiVisibilityScore: 45,
+
+    aiVisibilityInsights: {
+      strengths: ["Instagram content is indexed by some AI platforms"],
+      weaknesses: ["Instagram pages have limited semantic HTML for AI"],
+      recommendations: ["Use Instagram bio and captions strategically for AI discoverability"],
+    },
   };
 }
