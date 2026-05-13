@@ -1,5 +1,6 @@
 import lighthouse from "lighthouse";
-import puppeteer from "puppeteer-core";
+// import * as chromeLauncher from "chrome-launcher";
+import { launch } from "chrome-launcher";
 
 import { logger } from "./logger.js";
 
@@ -31,57 +32,40 @@ export async function runLighthouseAudit(
 ): Promise<LighthouseAuditResult> {
   logger.info({ url }, "Starting Lighthouse audit");
 
-  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
+  let chrome;
 
   try {
     // ======================================================
-    // LAUNCH CHROMIUM
+    // LAUNCH CHROME
     // ======================================================
 
-    // browser = await puppeteer.launch({
-    //   executablePath:
-    //     process.env
-    //       .PUPPETEER_EXECUTABLE_PATH ||
-    //     "/usr/bin/chromium",
-
-    //   headless: true,
-
-    //   args: [
-    //     "--no-sandbox",
-    //     "--disable-setuid-sandbox",
-    //     "--disable-dev-shm-usage",
-    //     "--disable-gpu",
-    //   ],
-    // });
-    browser = await puppeteer.launch({
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
-
-      headless: true,
-
-      args: [
+    chrome = await launch({
+      chromeFlags: [
+        "--headless",
         "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
         "--disable-gpu",
+        "--disable-dev-shm-usage",
+        "--disable-setuid-sandbox",
       ],
     });
-
-    const wsEndpoint = browser.wsEndpoint();
-
-    const port = Number(new URL(wsEndpoint).port);
 
     // ======================================================
     // RUN LIGHTHOUSE
     // ======================================================
 
     const runnerResult = await lighthouse(url, {
-      port,
+      port: chrome.port,
 
       output: "json",
 
       logLevel: "error",
 
-      onlyCategories: ["seo", "performance", "accessibility", "best-practices"],
+      onlyCategories: [
+        "seo",
+        "performance",
+        "accessibility",
+        "best-practices",
+      ],
     });
 
     if (!runnerResult) {
@@ -109,7 +93,9 @@ export async function runLighthouseAudit(
     const result: LighthouseAuditResult = {
       seoScore: Math.round((categories.seo?.score || 0) * 100),
 
-      performanceScore: Math.round((categories.performance?.score || 0) * 100),
+      performanceScore: Math.round(
+        (categories.performance?.score || 0) * 100,
+      ),
 
       accessibilityScore: Math.round(
         (categories.accessibility?.score || 0) * 100,
@@ -119,15 +105,20 @@ export async function runLighthouseAudit(
         (categories["best-practices"]?.score || 0) * 100,
       ),
 
-      lcp: audits["largest-contentful-paint"]?.displayValue || "N/A",
+      lcp:
+        audits["largest-contentful-paint"]?.displayValue || "N/A",
 
-      cls: audits["cumulative-layout-shift"]?.displayValue || "N/A",
+      cls:
+        audits["cumulative-layout-shift"]?.displayValue || "N/A",
 
-      fcp: audits["first-contentful-paint"]?.displayValue || "N/A",
+      fcp:
+        audits["first-contentful-paint"]?.displayValue || "N/A",
 
-      tti: audits["interactive"]?.displayValue || "N/A",
+      tti:
+        audits["interactive"]?.displayValue || "N/A",
 
-      speedIndex: audits["speed-index"]?.displayValue || "N/A",
+      speedIndex:
+        audits["speed-index"]?.displayValue || "N/A",
 
       failedAudits,
     };
@@ -143,18 +134,22 @@ export async function runLighthouseAudit(
     return result;
   } catch (error) {
     console.error("LIGHTHOUSE ERROR:", error);
+
     logger.error(
       {
         url,
-        error: String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
       },
       "Lighthouse failed",
     );
 
     throw error;
   } finally {
-    if (browser) {
-      await browser.close();
+    if (chrome) {
+      await chrome.kill();
     }
   }
 }
