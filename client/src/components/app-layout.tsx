@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, FolderOpen, Search, Key, FileText, BarChart2, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { LayoutDashboard, FolderOpen, Search, Key, FileText, BarChart2, Menu, X, Command } from "lucide-react";
+import { useState, useEffect } from "react";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -14,79 +15,115 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Global cursor tracker for futuristic glow border effects
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      document.querySelectorAll('.glow-border-effect').forEach((el) => {
+        const rect = (el as HTMLElement).getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        (el as HTMLElement).style.setProperty('--mouse-x', `${x}px`);
+        (el as HTMLElement).style.setProperty('--mouse-y', `${y}px`);
+      });
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
   return (
-    <div className="flex min-h-screen bg-background">
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-56 shrink-0 bg-sidebar border-r border-sidebar-border sticky top-0 h-screen">
-        <div className="p-5 border-b border-sidebar-border">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-md bg-sidebar-primary flex items-center justify-center">
-              <BarChart2 className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-sidebar-foreground font-bold text-sm tracking-tight">SEO Intelligence</span>
-          </Link>
+    <div className="flex flex-col lg:flex-row h-[100dvh] bg-transparent p-4 relative overflow-hidden gap-4 lg:gap-0">
+      {/* Background elements are handled in body css */}
+      
+      {/* Floating HUD Sidebar (Desktop) */}
+      <aside className="hidden lg:flex flex-col w-20 hover:w-64 transition-all duration-300 ease-in-out shrink-0 glass-panel rounded-2xl mr-4 overflow-hidden z-20 group relative glow-border-effect">
+        <div className="p-4 flex items-center whitespace-nowrap border-b border-white/5 overflow-hidden">
+          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+            <Command className="w-5 h-5 text-cyan-400" />
+          </div>
+          <span className="font-black tracking-tighter text-lg text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-300 neon-text-cyan ml-4">
+            SYS_CMD
+          </span>
         </div>
-        <nav className="flex-1 py-4 px-3 space-y-0.5 overflow-y-auto">
+        
+        <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto overflow-x-hidden scrollbar-hide">
           {navItems.map(({ href, label, icon: Icon }) => {
             const active = location === href || location.startsWith(href + "/");
             return (
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={cn(
+                  "flex items-center px-3 py-3 rounded-xl font-bold transition-all whitespace-nowrap border relative cursor-pointer overflow-hidden",
                   active
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                }`}
+                    ? "bg-cyan-500/5 text-cyan-400 border-cyan-500/20 shadow-[inset_0_0_15px_rgba(6,182,212,0.05)] glow-border-effect"
+                    : "text-muted-foreground hover:bg-white/5 hover:text-white border-transparent hover:border-white/10 glow-border-effect"
+                )}
               >
-                <Icon className="w-4 h-4 shrink-0" />
-                {label}
+                <div className="w-10 flex items-center justify-center shrink-0">
+                  <Icon className="w-5 h-5 shrink-0" />
+                </div>
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 tracking-widest uppercase text-xs ml-3">{label}</span>
               </Link>
             );
           })}
         </nav>
-        <div className="p-4 border-t border-sidebar-border space-y-4">
-          <div className="px-3">
-            <p className="text-xs font-semibold text-sidebar-foreground/40 uppercase tracking-wider">Local Mode</p>
-            <p className="text-sm text-sidebar-foreground/70 mt-1">Data saved securely in your browser.</p>
+        
+        <div className="p-4 border-t border-white/5 whitespace-nowrap overflow-hidden flex items-center">
+          <div className="w-10 flex items-center justify-center shrink-0">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)] animate-pulse" />
           </div>
+          <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[10px] font-mono text-emerald-400 uppercase tracking-widest ml-3">
+            Uplink Active
+          </span>
         </div>
       </aside>
 
-      {/* Mobile header */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-40 h-14 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded bg-sidebar-primary flex items-center justify-center">
-            <BarChart2 className="w-3.5 h-3.5 text-white" />
+      {/* Mobile Header HUD (Mobile/Tablet) */}
+      <header className="lg:hidden shrink-0 glass-panel rounded-2xl flex items-center justify-between p-3 glow-border-effect z-40">
+        <Link href="/dashboard" className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+            <Command className="w-5 h-5 text-cyan-400" />
           </div>
-          <span className="text-sidebar-foreground font-bold text-sm">SEO Intelligence</span>
+          <span className="font-black tracking-tighter text-lg text-foreground neon-text-cyan">SYS_CMD</span>
         </Link>
-        <button onClick={() => setMobileOpen(!mobileOpen)} className="text-sidebar-foreground/70 p-1">
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        <button onClick={() => setMobileOpen(!mobileOpen)} className="text-cyan-400 p-2 hover:bg-cyan-500/10 rounded-xl transition-colors border border-transparent hover:border-cyan-500/20">
+          {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
-      </div>
+      </header>
 
       {/* Mobile nav overlay */}
       {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-30 bg-sidebar pt-14">
-          <nav className="p-4 space-y-1">
-            {navItems.map(({ href, label, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent"
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-              </Link>
-            ))}
+        <div className="lg:hidden fixed inset-0 z-30 bg-black/95 backdrop-blur-3xl pt-24 px-4 overflow-y-auto">
+          <nav className="space-y-2">
+            {navItems.map(({ href, label, icon: Icon }) => {
+              const active = location === href || location.startsWith(href + "/");
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-4 rounded-xl font-bold transition-all text-sm uppercase tracking-widest border",
+                    active
+                      ? "bg-cyan-500/5 text-cyan-400 border-cyan-500/20 shadow-[inset_0_0_15px_rgba(6,182,212,0.05)] glow-border-effect"
+                      : "text-muted-foreground hover:bg-white/5 hover:text-white border-white/5 glow-border-effect"
+                  )}
+                >
+                  <Icon className="w-5 h-5" />
+                  {label}
+                </Link>
+              );
+            })}
           </nav>
         </div>
       )}
 
-      <main className="flex-1 min-w-0 md:pt-0 pt-14">
-        {children}
+      {/* Main Viewport */}
+      <main className="flex-1 min-w-0 min-h-0 relative z-10 glass-panel rounded-2xl glow-border-effect overflow-y-auto overflow-x-hidden flex flex-col">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(6,182,212,0.03),transparent_50%)] pointer-events-none" />
+        <div className="relative z-10 flex-1 p-4 md:p-8">
+          {children}
+        </div>
       </main>
     </div>
   );

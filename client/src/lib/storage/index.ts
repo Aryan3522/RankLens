@@ -42,6 +42,12 @@ export interface Analysis {
   fcp?: string | null;
   tti?: string | null;
   speedIndex?: string | null;
+  aiVisibilityScore?: number | null;
+  aiVisibilityInsights?: {
+    strengths: string[];
+    weaknesses: string[];
+    recommendations: string[];
+  } | null;
   createdAt: string;
   completedAt?: string | null;
 }

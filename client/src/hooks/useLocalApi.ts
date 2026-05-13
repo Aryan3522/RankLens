@@ -165,6 +165,8 @@ async function runBackendAnalysisAndSave(
       fcp: analysisData.fcp,
       tti: analysisData.tti,
       speedIndex: analysisData.speedIndex,
+      aiVisibilityScore: analysisData.aiVisibilityScore,
+      aiVisibilityInsights: analysisData.aiVisibilityInsights,
       completedAt: new Date().toISOString(),
     });
 
