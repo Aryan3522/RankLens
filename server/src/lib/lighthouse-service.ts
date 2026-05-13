@@ -40,6 +40,9 @@ export async function runLighthouseAudit(
     // ======================================================
 
     chrome = await launch({
+      chromePath:
+    process.env.CHROME_PATH ||
+    process.env.PUPPETEER_EXECUTABLE_PATH,
       chromeFlags: [
         "--headless",
         "--no-sandbox",
@@ -54,19 +57,33 @@ export async function runLighthouseAudit(
     // ======================================================
 
     const runnerResult = await lighthouse(url, {
-      port: chrome.port,
+  port: chrome.port,
 
-      output: "json",
+  output: "json",
 
-      logLevel: "error",
+  logLevel: "error",
 
-      onlyCategories: [
-        "seo",
-        "performance",
-        "accessibility",
-        "best-practices",
-      ],
-    });
+  maxWaitForLoad: 45000,
+
+  disableStorageReset: true,
+
+  formFactor: "desktop",
+
+  screenEmulation: {
+    mobile: false,
+    width: 1350,
+    height: 940,
+    deviceScaleFactor: 1,
+    disabled: false,
+  },
+
+  onlyCategories: [
+    "seo",
+    "performance",
+    "accessibility",
+    "best-practices",
+  ],
+});
 
     if (!runnerResult) {
       throw new Error("Lighthouse returned no result");
@@ -149,7 +166,11 @@ export async function runLighthouseAudit(
     throw error;
   } finally {
     if (chrome) {
-      await chrome.kill();
-    }
+  try {
+    await chrome.kill();
+  } catch {
+    logger.warn("Failed to kill Chrome process");
+  }
+}
   }
 }
