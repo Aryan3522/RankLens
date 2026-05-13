@@ -1,8 +1,9 @@
 import lighthouse from "lighthouse";
-// import * as chromeLauncher from "chrome-launcher";
-import { launch } from "chrome-launcher";
+import { launch, type LaunchedChrome } from "chrome-launcher";
+import chromium from "@sparticuz/chromium";
 
 import { logger } from "./logger.js";
+import { env } from "./env.js";
 
 export interface LighthouseAuditDetail {
   id: string;
@@ -32,58 +33,82 @@ export async function runLighthouseAudit(
 ): Promise<LighthouseAuditResult> {
   logger.info({ url }, "Starting Lighthouse audit");
 
-  let chrome;
+  let chrome: LaunchedChrome | null = null;
 
   try {
-    // ======================================================
-    // LAUNCH CHROME
-    // ======================================================
+    /**
+     * ======================================================
+     * CHROME EXECUTABLE
+     * ======================================================
+     */
+
+    const isProduction = env.NODE_ENV === "production";
+
+    let chromePath: string | undefined;
+
+    if (isProduction) {
+      chromePath =
+        process.env.CHROME_PATH ||
+        (await chromium.executablePath());
+    }
+
+    /**
+     * ======================================================
+     * LAUNCH CHROME
+     * ======================================================
+     */
 
     chrome = await launch({
-      chromePath:
-    process.env.CHROME_PATH ||
-    process.env.PUPPETEER_EXECUTABLE_PATH,
+      chromePath,
+
       chromeFlags: [
         "--headless",
         "--no-sandbox",
         "--disable-gpu",
         "--disable-dev-shm-usage",
         "--disable-setuid-sandbox",
+        "--disable-background-networking",
+        "--disable-background-timer-throttling",
+        "--disable-renderer-backgrounding",
+        "--disable-features=TranslateUI",
+        "--disable-ipc-flooding-protection",
       ],
     });
 
-    // ======================================================
-    // RUN LIGHTHOUSE
-    // ======================================================
+    /**
+     * ======================================================
+     * RUN LIGHTHOUSE
+     * ======================================================
+     */
 
     const runnerResult = await lighthouse(url, {
-  port: chrome.port,
+      port: chrome.port,
 
-  output: "json",
+      output: "json",
 
-  logLevel: "error",
+      logLevel: "error",
 
-  maxWaitForLoad: 45000,
+      maxWaitForLoad: 45000,
 
-  disableStorageReset: true,
+      disableStorageReset: true,
 
-  formFactor: "desktop",
+      formFactor: "desktop",
 
-  screenEmulation: {
-    mobile: false,
-    width: 1350,
-    height: 940,
-    deviceScaleFactor: 1,
-    disabled: false,
-  },
+      screenEmulation: {
+        mobile: false,
+        width: 1350,
+        height: 940,
+        deviceScaleFactor: 1,
+        disabled: false,
+      },
 
-  onlyCategories: [
-    "seo",
-    "performance",
-    "accessibility",
-    "best-practices",
-  ],
-});
+      onlyCategories: [
+        "seo",
+        "performance",
+        "accessibility",
+        "best-practices",
+      ],
+    });
 
     if (!runnerResult) {
       throw new Error("Lighthouse returned no result");
@@ -91,10 +116,19 @@ export async function runLighthouseAudit(
 
     const { categories, audits } = runnerResult.lhr;
 
+    /**
+     * ======================================================
+     * FAILED AUDITS
+     * ======================================================
+     */
+
     const failedAudits = Object.values(audits)
       .filter((audit: any) => {
         return (
           audit.score !== null &&
+          ["binary", "numeric"].includes(
+            audit.scoreDisplayMode,
+          ) &&
           audit.score < 0.9 &&
           audit.id !== "service-worker"
         );
@@ -107,8 +141,16 @@ export async function runLighthouseAudit(
         displayValue: audit.displayValue,
       }));
 
+    /**
+     * ======================================================
+     * FINAL RESULT
+     * ======================================================
+     */
+
     const result: LighthouseAuditResult = {
-      seoScore: Math.round((categories.seo?.score || 0) * 100),
+      seoScore: Math.round(
+        (categories.seo?.score || 0) * 100,
+      ),
 
       performanceScore: Math.round(
         (categories.performance?.score || 0) * 100,
@@ -123,19 +165,24 @@ export async function runLighthouseAudit(
       ),
 
       lcp:
-        audits["largest-contentful-paint"]?.displayValue || "N/A",
+        audits["largest-contentful-paint"]
+          ?.displayValue || "N/A",
 
       cls:
-        audits["cumulative-layout-shift"]?.displayValue || "N/A",
+        audits["cumulative-layout-shift"]
+          ?.displayValue || "N/A",
 
       fcp:
-        audits["first-contentful-paint"]?.displayValue || "N/A",
+        audits["first-contentful-paint"]
+          ?.displayValue || "N/A",
 
       tti:
-        audits["interactive"]?.displayValue || "N/A",
+        audits["interactive"]?.displayValue ||
+        "N/A",
 
       speedIndex:
-        audits["speed-index"]?.displayValue || "N/A",
+        audits["speed-index"]?.displayValue ||
+        "N/A",
 
       failedAudits,
     };
@@ -165,12 +212,20 @@ export async function runLighthouseAudit(
 
     throw error;
   } finally {
+    /**
+     * ======================================================
+     * CLEANUP
+     * ======================================================
+     */
+
     if (chrome) {
-  try {
-    await chrome.kill();
-  } catch {
-    logger.warn("Failed to kill Chrome process");
-  }
-}
+      try {
+        await chrome.kill();
+      } catch {
+        logger.warn(
+          "Failed to kill Chrome process",
+        );
+      }
+    }
   }
 }
