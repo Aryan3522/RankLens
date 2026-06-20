@@ -68,9 +68,17 @@ async function resolveChromePath(): Promise<string | undefined> {
     return resolvedChromePath;
   }
 
-  // 2. Production: try @sparticuz/chromium (Lambda) or common system paths
+  // 2. Production: try @sparticuz/chromium first (works on Render/Lambda),
+  //    then fall back to common system paths (apt-get installed Chromium)
   if (env.NODE_ENV === "production") {
-    // Try common Render / Linux paths first (cheaper than sparticuz extraction)
+    try {
+      resolvedChromePath = await chromium.executablePath();
+      logger.info({ path: resolvedChromePath }, "Using @sparticuz/chromium");
+      return resolvedChromePath;
+    } catch (err) {
+      logger.warn({ error: err }, "@sparticuz/chromium unavailable, trying system paths");
+    }
+
     const { existsSync } = await import("fs");
     const systemPaths = [
       "/usr/bin/chromium-browser",
@@ -87,14 +95,7 @@ async function resolveChromePath(): Promise<string | undefined> {
       }
     }
 
-    // Fallback: @sparticuz/chromium (for Lambda / serverless)
-    try {
-      resolvedChromePath = await chromium.executablePath();
-      logger.info({ path: resolvedChromePath }, "Using @sparticuz/chromium");
-      return resolvedChromePath;
-    } catch {
-      logger.warn("@sparticuz/chromium unavailable, falling back to auto-detect");
-    }
+    logger.warn("No Chrome/Chromium found via @sparticuz/chromium or system paths");
   }
 
   // 3. Development: let chrome-launcher auto-detect

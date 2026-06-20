@@ -14,6 +14,7 @@ import {
   updateSubmissionStatus,
 } from "../db/index.js";
 import { submitUrl } from "../lib/indexnow-service.js";
+import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
 
@@ -101,7 +102,7 @@ router.get("/submissions/stats", (req, res) => {
 router.post("/submit", async (req, res) => {
   const parsed = submitUrlSchema.safeParse(req.body);
   if (!parsed.success) {
-    console.error("[/submit] Zod validation failed — body:", JSON.stringify(req.body), "errors:", parsed.error.issues);
+    logger.error({ body: req.body, errors: parsed.error.issues }, "[/submit] Zod validation failed");
     res.status(400).json({ error: parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; ") });
     return;
   }
