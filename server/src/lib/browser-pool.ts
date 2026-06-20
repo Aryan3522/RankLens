@@ -90,12 +90,29 @@ async function resolveChromePath(): Promise<string | undefined> {
     }
 
     const { existsSync } = await import("fs");
-    const systemPaths = [
+    const { homedir } = await import("os");
+
+    // Platform-specific common Chrome/Chromium paths
+    const systemPaths: string[] = [
+      // Linux (Debian/Ubuntu)
       "/usr/bin/chromium-browser",
       "/usr/bin/chromium",
       "/usr/bin/google-chrome-stable",
       "/usr/bin/google-chrome",
+      "/snap/bin/chromium",
+      "/usr/lib/chromium-browser/chromium-browser",
+      "/opt/google/chrome/chrome",
+      // macOS
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "/Applications/Chromium.app/Contents/MacOS/Chromium",
+      `${homedir()}/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`,
+      `${homedir()}/Applications/Chromium.app/Contents/MacOS/Chromium`,
+      // Windows (via WSL / cross-compile)
+      "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe",
+      "/mnt/c/Program Files (x86)/Google/Chrome/Application/chrome.exe",
     ];
+    // On Windows, chrome-launcher will find Chrome via registry —
+    // no need for explicit paths here.
 
     for (const p of systemPaths) {
       if (existsSync(p)) {
