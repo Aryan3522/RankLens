@@ -11,7 +11,6 @@
 #   Start Command:  npm start
 #   Env Variables:
 #     NODE_ENV=production
-#     CHROME_PATH=/usr/bin/chromium-browser  (or /usr/bin/google-chrome-stable)
 #     CHROME_POOL_SIZE=1  (1 for free tier, 2 for starter+)
 # ============================================================
 
@@ -57,7 +56,6 @@ fi
 
 echo "=== Building server ==="
 
-npm ci
-npm run build
+npm run build:tsc
 
 echo "=== Build complete ==="
