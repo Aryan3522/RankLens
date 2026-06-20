@@ -4,7 +4,50 @@ import { v4 as uuidv4 } from "uuid";
 
 // Define strict types replacing DB schema
 export type AnalysisType = "website" | "youtube" | "instagram";
-export type AnalysisStatus = "pending" | "queued" | "running" | "completed" | "failed";
+export type AnalysisStatus = "pending" | "queued" | "running" | "completed" | "failed" | "unsupported";
+
+export type AiCategoryStatus = "strong" | "moderate" | "weak";
+
+export interface AiCategory {
+  id: string;
+  label: string;
+  score: number;
+  points: number;
+  maxPoints: number;
+  weight: number;
+  status: AiCategoryStatus;
+  whatItMeans: string;
+  strengths: string[];
+  weaknesses: string[];
+  recommendations: string[];
+}
+
+export interface AiEngineReadiness {
+  engine: string;
+  score: number;
+  status: AiCategoryStatus;
+  note: string;
+}
+
+export interface ActionItem {
+  priority: "critical" | "important" | "nice-to-have";
+  title: string;
+  steps: string[];
+  estimatedImpact: number;
+  category: string;
+}
+
+export interface AnalysisSummary {
+  headline: string;
+  criticalCount: number;
+  topActions: string[];
+}
+
+export interface LlmEnhancement {
+  executiveSummary: string;
+  entityGaps: string[];
+  recommendations: { title: string; detail: string; priority: "high" | "medium" | "low" }[];
+}
 
 export interface Project {
   id: string; // Changed from number to UUID string for local generation
@@ -48,6 +91,14 @@ export interface Analysis {
     weaknesses: string[];
     recommendations: string[];
   } | null;
+  aiVisibilityCategories?: AiCategory[] | null;
+  aiEngineReadiness?: AiEngineReadiness[] | null;
+  actionPlan?: ActionItem[] | null;
+  summary?: AnalysisSummary | null;
+  llmSummary?: LlmEnhancement | null;
+  message?: string | null;
+  /** Seconds to wait before retrying — set when the server returns 429. */
+  retryAfter?: number | null;
   createdAt: string;
   completedAt?: string | null;
 }

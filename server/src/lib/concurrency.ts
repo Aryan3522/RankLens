@@ -1,8 +1,8 @@
 import { logger } from "./logger.js";
 
-/**
- * Simple in-memory rate limiter
- */
+// ======================================================
+// RATE LIMITER
+// ======================================================
 
 class LocalRateLimiter {
   private requests = new Map<
@@ -65,31 +65,48 @@ class LocalRateLimiter {
   }
 }
 
-/**
- * Lightweight async task queue
- */
+// ======================================================
+// TASK QUEUE
+//
+// Supports configurable concurrency, backpressure via
+// max queue depth, and metrics/observability.
+// ======================================================
 
 class TaskQueue {
   private queue: (() => Promise<void>)[] = [];
-
   private running = 0;
+  private completed = 0;
+  private failed = 0;
 
-  constructor(private maxConcurrency = 1) {}
+  constructor(
+    private maxConcurrency: number,
+    private maxQueueDepth: number = 10,
+  ) {}
 
+  /**
+   * Add a task. Throws if queue is full (backpressure).
+   */
   async add<T>(task: () => Promise<T>): Promise<T> {
+    // Backpressure: reject if queue is too deep
+    if (this.queue.length >= this.maxQueueDepth) {
+      throw new QueueFullError(
+        `Analysis queue is full (${this.queue.length}/${this.maxQueueDepth}). Try again later.`,
+      );
+    }
+
     return new Promise((resolve, reject) => {
       const wrappedTask = async () => {
         this.running++;
 
         try {
           const result = await task();
-
+          this.completed++;
           resolve(result);
         } catch (error) {
+          this.failed++;
           reject(error);
         } finally {
           this.running--;
-
           this.next();
         }
       };
@@ -117,14 +134,31 @@ class TaskQueue {
     void task();
   }
 
-  getPendingCount() {
-    return this.queue.length;
+  getStats() {
+    return {
+      pending: this.queue.length,
+      running: this.running,
+      completed: this.completed,
+      failed: this.failed,
+      maxConcurrency: this.maxConcurrency,
+      maxQueueDepth: this.maxQueueDepth,
+    };
   }
 }
 
 /**
- * Cleanup expired rate limit entries every 10 mins
+ * Custom error for queue full / backpressure
  */
+export class QueueFullError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "QueueFullError";
+  }
+}
+
+// ======================================================
+// CLEANUP
+// ======================================================
 
 const cleanupInterval = setInterval(() => {
   generalRateLimiter.cleanup();
@@ -135,14 +169,20 @@ const cleanupInterval = setInterval(() => {
 
 cleanupInterval.unref();
 
-/**
- * Shared instances
- */
+// ======================================================
+// SHARED INSTANCES
+//
+// Queue concurrency matches pool size (default 2).
+// Max queue depth = 10: beyond this, return 503.
+// ======================================================
 
-export const analysisQueue = new TaskQueue(1);
+const poolSize = Number(process.env.CHROME_POOL_SIZE) || 2;
+
+export const analysisQueue = new TaskQueue(poolSize, 10);
 
 export const generalRateLimiter =
   new LocalRateLimiter(100, 15 * 60 * 1000);
 
+// Product rule: 1 analysis per user per minute (the client shows a 60s countdown).
 export const analysisRateLimiter =
-  new LocalRateLimiter(5, 60 * 60 * 1000);
+  new LocalRateLimiter(1, 60 * 1000);

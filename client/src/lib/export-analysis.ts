@@ -1,11 +1,16 @@
 /**
- * Export Analysis Report
- * 
- * Builds a comprehensive, structured JSON report from analysis data.
- * Designed to be:
- * 1. Human-readable with clear section headers and descriptions
- * 2. AI-parseable so any LLM can immediately understand and give actionable advice
- * 3. Self-contained — includes all scores, issues, recommendations, and metadata
+ * Export Analysis as an AI-ready FIX BRIEF.
+ *
+ * Produces a single self-contained markdown document that:
+ *  1. Opens with an instruction prompt telling an AI assistant exactly what to
+ *     do — fix every listed issue in the user's codebase, step by step.
+ *  2. Includes ALL fixable data: the prioritized action plan, every issue with
+ *     its fix example, AI-visibility gaps with recommendations, missing
+ *     entities, and all recommendations.
+ *
+ * The user can paste the whole thing into any AI assistant with no extra
+ * explanation. Used by both the Download (.md file) and Copy (clipboard)
+ * buttons.
  */
 
 interface ExportableAnalysis {
@@ -24,6 +29,11 @@ interface ExportableAnalysis {
     weaknesses: string[];
     recommendations: string[];
   } | null;
+  aiVisibilityCategories?: any[] | null;
+  aiEngineReadiness?: any[] | null;
+  actionPlan?: any[] | null;
+  summary?: { headline: string; criticalCount: number; topActions: string[] } | null;
+  llmSummary?: { executiveSummary: string; entityGaps: string[]; recommendations: any[] } | null;
   metaTitle?: string | null;
   metaDescription?: string | null;
   h1Count?: number | null;
@@ -32,216 +42,240 @@ interface ExportableAnalysis {
   internalLinks?: number | null;
   externalLinks?: number | null;
   imagesMissingAlt?: number | null;
-  pageLoadScore?: number | null;
-  pageCount?: number | null;
   lcp?: string | null;
   cls?: string | null;
   fcp?: string | null;
-  tti?: string | null;
   speedIndex?: string | null;
-  issueCount?: number | null;
   issues?: any[];
   recommendations?: any[];
   createdAt: string;
   completedAt?: string | null;
 }
 
-function getScoreRating(score: number | null | undefined): string {
-  if (score == null) return "N/A";
-  if (score >= 90) return "Excellent";
-  if (score >= 80) return "Good";
-  if (score >= 60) return "Needs Improvement";
-  if (score >= 40) return "Poor";
-  return "Critical";
+const SEVERITY_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+const PRIORITY_ORDER: Record<string, number> = {
+  critical: 0, high: 0, important: 1, medium: 1, low: 2, "nice-to-have": 2,
+};
+
+export type FixScope = "all" | "seo" | "ai";
+
+const AI_CATEGORY = "AI Visibility";
+
+/**
+ * Builds an AI-ready fix brief as a markdown string.
+ *
+ * - scope "all": the complete audit (SEO + AI visibility).
+ * - scope "seo": technical SEO, performance, content & metadata issues only.
+ * - scope "ai": AI-visibility gaps, entities, engine readiness & E-E-A-T only.
+ */
+export function buildAiFixText(analysis: ExportableAnalysis, scope: FixScope = "all"): string {
+  const includeSeo = scope !== "ai";
+  const includeAi = scope !== "seo";
+
+  const allIssues = (analysis.issues ?? []) as any[];
+  const allRecs = (analysis.recommendations ?? []) as any[];
+  const categories = (analysis.aiVisibilityCategories ?? []) as any[];
+  const engines = (analysis.aiEngineReadiness ?? []) as any[];
+  const allActions = (analysis.actionPlan ?? []) as any[];
+  const llm = includeAi ? analysis.llmSummary : null;
+
+  // Scope the data: SEO owns everything not tagged "AI Visibility"; AI owns the rest.
+  const issues = includeSeo ? allIssues : [];
+  const actionPlan =
+    scope === "all" ? allActions
+    : scope === "seo" ? allActions.filter((a) => a.category !== AI_CATEGORY)
+    : allActions.filter((a) => a.category === AI_CATEGORY);
+  const recommendations =
+    scope === "all" ? allRecs
+    : scope === "seo" ? allRecs.filter((r) => r.category !== AI_CATEGORY)
+    : allRecs.filter((r) => r.category === AI_CATEGORY);
+
+  const out: string[] = [];
+  const push = (s = "") => out.push(s);
+
+  // ---- 1. Instruction prompt -------------------------------------------
+  const title = scope === "seo" ? "SEO Fix Brief" : scope === "ai" ? "AI Visibility Fix Brief" : "Fix Brief";
+  push(`# ${title} — ${analysis.url}`);
+  push();
+  push("## YOUR TASK (read first)");
+  push();
+  if (scope === "seo") {
+    push(
+      "You are a senior technical-SEO engineer. Below is the SEO, performance, content and metadata audit of my web page. " +
+      "Fix **every** issue in my codebase, working through them in priority order (Critical → Important → Nice-to-have).",
+    );
+  } else if (scope === "ai") {
+    push(
+      "You are an AI-visibility engineer. Your goal is to make my web page easy for AI answer engines " +
+      "(ChatGPT, Gemini, Claude, Perplexity, Copilot) to crawl, understand, trust, and cite. " +
+      "Apply **every** improvement below in my codebase, working through them in priority order (Critical → Important → Nice-to-have).",
+    );
+  } else {
+    push(
+      "You are a senior SEO and AI-visibility engineer. Below is a complete audit of my web page. " +
+      "Fix **every** issue in my codebase, working through them in priority order (Critical → Important → Nice-to-have).",
+    );
+  }
+  push();
+  push("For each item:");
+  push("1. Locate the relevant file, template, or component in my project.");
+  push("2. Apply the fix — use the provided **Fix** snippet as a guide and adapt it to my framework/stack.");
+  push("3. After each change, state in one line what you changed and which file.");
+  push();
+  push(
+    "Work autonomously: make reasonable assumptions and keep going rather than stopping to ask. " +
+    "When you finish, give me (a) a short summary of everything you changed, and (b) any steps only I can do " +
+    "(e.g. writing content, configuring DNS/hosting, adding real author bios). " +
+    "Prioritize the Action Plan order; it already weighs impact.",
+  );
+  push();
+  push("---");
+  push();
+
+  // ---- 2. Page snapshot -------------------------------------------------
+  push("## Page snapshot");
+  push();
+  push(`- **URL:** ${analysis.url}`);
+  push(`- **Analyzed:** ${new Date(analysis.createdAt).toISOString().slice(0, 10)}`);
+  push(`- **SEO score:** ${fmtScore(analysis.seoScore)} / 100`);
+  push(`- **AI visibility score:** ${fmtScore(analysis.aiVisibilityScore)} / 100`);
+  push(`- **Performance:** ${fmtScore(analysis.performanceScore)} · **Accessibility:** ${fmtScore(analysis.accessibilityScore)} · **Best practices:** ${fmtScore(analysis.bestPracticesScore)}`);
+  push(`- **Core Web Vitals:** LCP ${analysis.lcp ?? "—"} · CLS ${analysis.cls ?? "—"} · FCP ${analysis.fcp ?? "—"} · Speed Index ${analysis.speedIndex ?? "—"}`);
+  push(`- **Content:** ${analysis.wordCount ?? 0} words · H1×${analysis.h1Count ?? 0} · H2×${analysis.h2Count ?? 0} · ${analysis.internalLinks ?? 0} internal / ${analysis.externalLinks ?? 0} external links · ${analysis.imagesMissingAlt ?? 0} images missing alt`);
+  push(`- **Title tag:** ${analysis.metaTitle ? `\`${analysis.metaTitle}\` (${analysis.metaTitle.length} chars)` : "MISSING"}`);
+  push(`- **Meta description:** ${analysis.metaDescription ? `\`${analysis.metaDescription}\` (${analysis.metaDescription.length} chars)` : "MISSING"}`);
+  push();
+
+  // The global headline references the overall critical-issue count, which can
+  // include items outside a scoped brief — only show it in the full brief.
+  if (scope === "all" && analysis.summary?.headline) {
+    push(`> ${analysis.summary.headline}`);
+    push();
+  }
+  if (llm?.executiveSummary) {
+    push("**AI consultant summary:** " + llm.executiveSummary);
+    push();
+  }
+  push("---");
+  push();
+
+  // ---- 3. Action plan ---------------------------------------------------
+  if (actionPlan.length > 0) {
+    push("## Action plan (do these in order)");
+    push();
+    actionPlan.forEach((a: any, i: number) => {
+      push(`### ${i + 1}. [${(a.priority ?? "").toUpperCase()}] ${a.title}  _(impact ${a.estimatedImpact ?? "?"}/100, ${a.category ?? "general"})_`);
+      (a.steps ?? []).forEach((s: string) => push(`- ${s}`));
+      push();
+    });
+    push("---");
+    push();
+  }
+
+  // ---- 4. Issues with fixes --------------------------------------------
+  if (issues.length > 0) {
+    const sorted = [...issues].sort(
+      (a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9),
+    );
+    push(`## Issues to fix (${issues.length})`);
+    push();
+    sorted.forEach((issue: any) => {
+      push(`### [${(issue.severity ?? "").toUpperCase()}] ${issue.title}  _(${issue.category})_`);
+      if (issue.description) push(issue.description);
+      if (issue.whyItMatters) push(`- **Why it matters:** ${issue.whyItMatters}`);
+      if (issue.element) {
+        push(`- **Current${issue.lineNumber ? ` (line ${issue.lineNumber})` : ""}:**`);
+        push("```html");
+        push(String(issue.element));
+        push("```");
+      }
+      if (issue.fixExample) {
+        push("- **Fix:**");
+        push("```");
+        push(String(issue.fixExample));
+        push("```");
+      }
+      if (issue.helpUrl) push(`- **Docs:** ${issue.helpUrl}`);
+      push();
+    });
+    push("---");
+    push();
+  }
+
+  // ---- 5. AI visibility gaps -------------------------------------------
+  const weakCats = includeAi ? categories.filter((c: any) => c.status !== "strong") : [];
+  if (weakCats.length > 0) {
+    push("## AI visibility gaps (improve these so AI engines can find & cite you)");
+    push();
+    weakCats
+      .sort((a: any, b: any) => (a.score ?? 0) - (b.score ?? 0))
+      .forEach((c: any) => {
+        push(`### ${c.label} — ${c.score}/100 (${c.status})`);
+        if (c.whatItMeans) push(`_${c.whatItMeans}_`);
+        (c.weaknesses ?? []).forEach((w: string) => push(`- Gap: ${w}`));
+        (c.recommendations ?? []).forEach((r: string) => push(`- Fix: ${r}`));
+        push();
+      });
+    push("---");
+    push();
+  }
+
+  // ---- 6. Missing entities ---------------------------------------------
+  const entityGaps = llm?.entityGaps ?? [];
+  if (entityGaps.length > 0) {
+    push("## Missing entities & topics to cover");
+    push();
+    entityGaps.forEach((g: string) => push(`- ${g}`));
+    push();
+    push("---");
+    push();
+  }
+
+  // ---- 7. Engine readiness (context) -----------------------------------
+  if (includeAi && engines.length > 0) {
+    push("## AI engine readiness (for context)");
+    push();
+    engines.forEach((e: any) => push(`- **${e.engine}:** ${e.score}/100 — ${e.note}`));
+    push();
+    push("---");
+    push();
+  }
+
+  // ---- 8. All recommendations ------------------------------------------
+  if (recommendations.length > 0) {
+    push("## Additional recommendations");
+    push();
+    [...recommendations]
+      .sort((a, b) => {
+        const p = (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9);
+        return p || (b.estimatedImpact ?? 0) - (a.estimatedImpact ?? 0);
+      })
+      .forEach((r: any) => {
+        push(`- **[${(r.priority ?? "").toUpperCase()}] ${r.title}** (impact ${r.estimatedImpact ?? "?"}/100, ${r.category}) — ${r.description}`);
+      });
+    push();
+  }
+
+  if (llm?.recommendations?.length) {
+    push("## AI consultant recommendations");
+    push();
+    llm.recommendations.forEach((r: any) => {
+      push(`- **[${(r.priority ?? "").toUpperCase()}] ${r.title}** — ${r.detail}`);
+    });
+    push();
+  }
+
+  // Collapse any trailing blank/divider lines so the footer has exactly one rule.
+  while (out.length && (out[out.length - 1] === "" || out[out.length - 1] === "---")) out.pop();
+  push("");
+  push("---");
+  push("_Generated by RankLens — SEO & AI Visibility Intelligence._");
+
+  return out.join("\n");
 }
 
-function buildExportReport(analysis: ExportableAnalysis) {
-  const issues = (analysis.issues ?? []) as any[];
-  const recommendations = (analysis.recommendations ?? []) as any[];
-
-  const criticalIssues = issues.filter(i => i.severity === "critical");
-  const warningIssues = issues.filter(i => i.severity === "warning");
-  const infoIssues = issues.filter(i => i.severity === "info");
-
-  const report = {
-    _metadata: {
-      reportTitle: "RankLens SEO & AI Visibility Analysis Report",
-      generatedAt: new Date().toISOString(),
-      generatedBy: "RankLens SEO Platform",
-      purpose: "This report contains a complete SEO and AI visibility audit of the analyzed URL. It is structured for both human reading and AI/LLM consumption. Feed this file to any AI assistant to get actionable improvement suggestions.",
-      version: "1.0",
-    },
-
-    summary: {
-      analyzedUrl: analysis.url,
-      analysisType: analysis.type,
-      analysisDate: analysis.createdAt,
-      completedAt: analysis.completedAt ?? null,
-      overallSeoScore: analysis.seoScore ?? null,
-      overallSeoRating: getScoreRating(analysis.seoScore),
-      aiVisibilityScore: analysis.aiVisibilityScore ?? null,
-      aiVisibilityRating: getScoreRating(analysis.aiVisibilityScore),
-      totalIssuesFound: issues.length,
-      criticalIssues: criticalIssues.length,
-      warnings: warningIssues.length,
-      informational: infoIssues.length,
-      totalRecommendations: recommendations.length,
-    },
-
-    scores: {
-      _description: "All scores are on a 0-100 scale. Higher is better.",
-      seoScore: {
-        value: analysis.seoScore ?? null,
-        rating: getScoreRating(analysis.seoScore),
-        description: "Overall SEO health score combining technical SEO, content optimization, and crawlability factors.",
-      },
-      performanceScore: {
-        value: analysis.performanceScore ?? null,
-        rating: getScoreRating(analysis.performanceScore),
-        description: "Page load performance score based on Lighthouse metrics including LCP, FCP, CLS, and Speed Index.",
-      },
-      accessibilityScore: {
-        value: analysis.accessibilityScore ?? null,
-        rating: getScoreRating(analysis.accessibilityScore),
-        description: "Web accessibility compliance score based on WCAG guidelines.",
-      },
-      bestPracticesScore: {
-        value: analysis.bestPracticesScore ?? null,
-        rating: getScoreRating(analysis.bestPracticesScore),
-        description: "Score for adherence to modern web development best practices.",
-      },
-      mobileScore: {
-        value: analysis.mobileScore ?? null,
-        rating: getScoreRating(analysis.mobileScore),
-        description: "Mobile-friendliness and responsive design score.",
-      },
-      aiVisibilityScore: {
-        value: analysis.aiVisibilityScore ?? null,
-        rating: getScoreRating(analysis.aiVisibilityScore),
-        description: "How well this page is optimized for AI search engines, LLM crawlers, and generative search experiences.",
-      },
-    },
-
-    coreWebVitals: {
-      _description: "Core Web Vitals are Google's key metrics for measuring real-world user experience.",
-      largestContentfulPaint: {
-        value: analysis.lcp ?? null,
-        metric: "LCP",
-        target: "≤ 2.5 seconds",
-        description: "Measures loading performance. The time it takes for the largest content element to become visible.",
-      },
-      cumulativeLayoutShift: {
-        value: analysis.cls ?? null,
-        metric: "CLS",
-        target: "≤ 0.1",
-        description: "Measures visual stability. How much the page layout shifts during loading.",
-      },
-      firstContentfulPaint: {
-        value: analysis.fcp ?? null,
-        metric: "FCP",
-        target: "≤ 1.8 seconds",
-        description: "Measures perceived load speed. The time from navigation to when the browser renders the first piece of content.",
-      },
-      speedIndex: {
-        value: analysis.speedIndex ?? null,
-        metric: "SI",
-        target: "≤ 3.4 seconds",
-        description: "How quickly the contents of a page are visibly populated.",
-      },
-      timeToInteractive: {
-        value: analysis.tti ?? null,
-        metric: "TTI",
-        target: "≤ 3.8 seconds",
-        description: "Time until the page becomes fully interactive.",
-      },
-    },
-
-    contentAnalysis: {
-      _description: "Content structure and on-page SEO elements.",
-      metaTitle: {
-        value: analysis.metaTitle ?? null,
-        characterCount: analysis.metaTitle?.length ?? 0,
-        idealRange: "30-60 characters",
-        isOptimal: analysis.metaTitle ? analysis.metaTitle.length >= 30 && analysis.metaTitle.length <= 60 : false,
-      },
-      metaDescription: {
-        value: analysis.metaDescription ?? null,
-        characterCount: analysis.metaDescription?.length ?? 0,
-        idealRange: "120-160 characters",
-        isOptimal: analysis.metaDescription ? analysis.metaDescription.length >= 120 && analysis.metaDescription.length <= 160 : false,
-      },
-      headingStructure: {
-        h1Tags: analysis.h1Count ?? null,
-        h2Tags: analysis.h2Count ?? null,
-        h1Recommendation: "Exactly 1 H1 tag per page",
-        isH1Optimal: analysis.h1Count === 1,
-      },
-      wordCount: analysis.wordCount ?? null,
-      linkProfile: {
-        internalLinks: analysis.internalLinks ?? null,
-        externalLinks: analysis.externalLinks ?? null,
-      },
-      imagesMissingAlt: analysis.imagesMissingAlt ?? null,
-    },
-
-    ...(analysis.aiVisibilityScore != null && analysis.aiVisibilityInsights ? {
-      aiVisibilityAnalysis: {
-        _description: "Analysis of how well the page is structured for AI search engines and LLM crawlers like ChatGPT, Google AI Overviews, and Perplexity.",
-        score: analysis.aiVisibilityScore,
-        strengths: analysis.aiVisibilityInsights.strengths ?? [],
-        weaknesses: analysis.aiVisibilityInsights.weaknesses ?? [],
-        actionItems: analysis.aiVisibilityInsights.recommendations ?? [],
-      },
-    } : {}),
-
-    issues: {
-      _description: "All detected SEO issues sorted by severity (critical first). Each issue includes the problem, affected element, and how to fix it.",
-      total: issues.length,
-      bySeverity: {
-        critical: criticalIssues.length,
-        warning: warningIssues.length,
-        info: infoIssues.length,
-      },
-      items: [...issues]
-        .sort((a, b) => {
-          const order: Record<string, number> = { critical: 0, warning: 1, info: 2 };
-          return (order[a.severity] ?? 9) - (order[b.severity] ?? 9);
-        })
-        .map(issue => ({
-          severity: issue.severity,
-          category: issue.category,
-          title: issue.title,
-          description: issue.description,
-          affectedUrl: issue.affectedUrl ?? null,
-          element: issue.element ?? null,
-          lineNumber: issue.lineNumber ?? null,
-          fixExample: issue.fixExample ?? null,
-          helpUrl: issue.helpUrl ?? null,
-        })),
-    },
-
-    recommendations: {
-      _description: "Actionable recommendations to improve SEO, sorted by priority and estimated impact.",
-      total: recommendations.length,
-      items: [...recommendations]
-        .sort((a, b) => {
-          const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
-          const pDiff = (order[a.priority] ?? 9) - (order[b.priority] ?? 9);
-          return pDiff || (b.estimatedImpact - a.estimatedImpact);
-        })
-        .map(rec => ({
-          priority: rec.priority,
-          category: rec.category,
-          title: rec.title,
-          description: rec.description,
-          estimatedImpact: rec.estimatedImpact,
-        })),
-    },
-
-    _aiPromptHint: "You are an SEO expert reviewing this report. Based on the scores, issues, and recommendations above, provide a prioritized action plan to improve this website's SEO score, AI visibility, and overall web performance. Focus on critical issues first, then high-impact recommendations.",
-  };
-
-  return report;
+function fmtScore(v: number | null | undefined): string {
+  return v == null ? "—" : String(v);
 }
 
 function sanitizeFilename(url: string): string {
@@ -253,12 +287,13 @@ function sanitizeFilename(url: string): string {
     .slice(0, 60);
 }
 
-export function downloadAnalysisReport(analysis: ExportableAnalysis) {
-  const report = buildExportReport(analysis);
-  const json = JSON.stringify(report, null, 2);
-  const blob = new Blob([json], { type: "application/json" });
+/** Downloads the AI fix brief as a markdown (.md) file. */
+export function downloadAnalysisReport(analysis: ExportableAnalysis, scope: FixScope = "all") {
+  const text = buildAiFixText(analysis, scope);
+  const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  const filename = `ranklens-report_${sanitizeFilename(analysis.url)}_${new Date().toISOString().slice(0, 10)}.json`;
+  const scopeTag = scope === "all" ? "" : `${scope}-`;
+  const filename = `ranklens-${scopeTag}fix-brief_${sanitizeFilename(analysis.url)}_${new Date().toISOString().slice(0, 10)}.md`;
 
   const a = document.createElement("a");
   a.href = url;
@@ -267,4 +302,28 @@ export function downloadAnalysisReport(analysis: ExportableAnalysis) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+/** Copies the AI fix brief to the clipboard. Returns true on success. */
+export async function copyAnalysisReport(analysis: ExportableAnalysis, scope: FixScope = "all"): Promise<boolean> {
+  const text = buildAiFixText(analysis, scope);
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Fallback for non-secure contexts / older browsers.
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
 }

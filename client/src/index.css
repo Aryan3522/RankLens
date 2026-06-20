@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
@@ -58,6 +58,7 @@
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 
   --font-sans: var(--app-font-sans);
+  --font-display: var(--app-font-display);
   --font-mono: var(--app-font-mono);
 
   --radius-sm: calc(var(--radius) - 4px);
@@ -66,67 +67,266 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* FUTURISTIC DARK THEME */
+/* GRAPHITE AI-NATIVE THEME */
 :root {
-  --background: 0 0% 0%; /* Pure Deep Black #000000 */
+  /* Type system — futuristic display + clean body + mono for data */
+  --app-font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --app-font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --app-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --background: 220 20% 5%; /* Deep Graphite #0B0D11 */
   --foreground: 210 40% 98%; /* #fafafa */
-  
-  --border: 240 5% 15%;
-  --input: 240 5% 15%;
-  --ring: 190 90% 50%; /* Neon Cyan */
 
-  --card: 240 5% 4%;
+  --border: 214 18% 16%;
+  --input: 214 18% 16%;
+  --ring: 219 100% 65%; /* Electric Blue */
+
+  --card: 216 23% 9%; /* Carbon #11151B */
   --card-foreground: 210 40% 98%;
-  --card-border: 240 5% 15%;
+  --card-border: 214 18% 16%;
 
-  --popover: 240 5% 4%;
+  --popover: 216 23% 9%;
   --popover-foreground: 210 40% 98%;
-  --popover-border: 240 5% 15%;
+  --popover-border: 214 18% 16%;
 
-  --primary: 190 90% 50%; /* Neon Cyan */
-  --primary-foreground: 240 10% 4%;
-  
-  --secondary: 270 90% 60%; /* Neon Purple */
+  --primary: 219 100% 65%; /* Electric Blue #4F8CFF */
+  --primary-foreground: 220 30% 6%;
+
+  --secondary: 252 100% 68%; /* AI Purple #7C5CFF */
   --secondary-foreground: 210 40% 98%;
 
-  --muted: 240 5% 12%;
-  --muted-foreground: 240 5% 65%;
+  --muted: 212 22% 12%; /* Slate Graphite #171D24 */
+  --muted-foreground: 216 20% 74%;
 
-  --accent: 240 5% 15%;
+  --accent: 212 22% 12%;
   --accent-foreground: 210 40% 98%;
 
-  --destructive: 0 84% 60%;
+  --destructive: 350 100% 68%; /* Error #FF5E7A */
   --destructive-foreground: 210 40% 98%;
 
-  --chart-1: 190 90% 50%;
-  --chart-2: 270 90% 60%;
-  --chart-3: 150 90% 50%; /* Neon Green */
-  --chart-4: 330 90% 60%; /* Neon Pink */
-  --chart-5: 45 100% 50%; /* Neon Gold */
+  --chart-1: 219 100% 65%; /* Electric Blue */
+  --chart-2: 252 100% 68%; /* AI Purple */
+  --chart-3: 159 67% 49%; /* Success #29D398 */
+  --chart-4: 350 100% 68%; /* Error #FF5E7A */
+  --chart-5: 36 100% 64%; /* Warning #FFB648 */
 
   --radius: 0.75rem;
+
+  /* ── Premium design tokens (theme-aware) ───────────────────────── */
+  /* Glassmorphism tiers — one source of truth for the new surfaces.
+     Stored as raw RGB channels (consumed via rgb(var(--glass-*))).
+     Base channels are graphite #0B0D11 so panels read as carbon glass. */
+  --glass-bg: 11 13 17 / 0.55;
+  --glass-bg-strong: 11 13 17 / 0.74;
+  --glass-bg-subtle: 11 13 17 / 0.34;
+  --glass-border: 255 255 255 / 0.10;
+  --glass-blur: 18px;
+
+  /* ── Skeuomorphic surfaces (graphite, tactile) ─────────────────── */
+  /* Raised = top inner highlight + outer drop shadow (convex).
+     Inset = recessed well (concave). One source of truth for the look. */
+  --skeu-grad: linear-gradient(180deg, hsl(212 22% 13%), hsl(216 24% 8%));
+  --skeu-grad-raised: linear-gradient(180deg, hsl(212 22% 15%), hsl(214 23% 10%));
+  --skeu-raise: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 26px rgb(0 0 0 / 0.45);
+  --skeu-raise-sm: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 1px 2px rgb(0 0 0 / 0.45), 0 4px 12px rgb(0 0 0 / 0.4);
+  --skeu-raise-lg: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 2px 4px rgb(0 0 0 / 0.5), 0 18px 50px rgb(0 0 0 / 0.55);
+  --skeu-inset: inset 0 2px 6px rgb(0 0 0 / 0.6), inset 0 -1px 0 rgb(255 255 255 / 0.04);
+  --skeu-edge: rgb(255 255 255 / 0.07);
+  --skeu-press: inset 0 2px 5px rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(0 0 0 / 0.3);
+
+  /* Layered elevation shadows for floating/bento surfaces */
+  --shadow-elev-1: 0 1px 2px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.35);
+  --shadow-elev-2: 0 4px 12px rgba(0,0,0,0.45), 0 12px 40px rgba(0,0,0,0.4);
+  --shadow-elev-3: 0 8px 24px rgba(0,0,0,0.5), 0 24px 70px rgba(0,0,0,0.5);
+
+  /* Brand accents as raw colors for JS / 3D materials */
+  --accent-cyan: #4FE5FF;
+  --accent-purple: #7C5CFF;
+  --accent-emerald: #29D398;
+
+  /* Decorative layer tints (grid + aurora) — overridden in light mode */
+  --grid-line: rgba(79, 140, 255, 0.05);
+  --aurora-1: rgba(79, 140, 255, 0.45);
+  --aurora-2: rgba(124, 92, 255, 0.42);
+  --aurora-opacity: 0.35;
 
   color-scheme: dark;
 }
 
+/* Explicit dark class mirrors :root so next-themes' class strategy keeps
+   resolving once an explicit theme class is written on <html>. */
 .dark {
-  /* Inherit root variables natively since we are dark-first */
+  --background: 220 20% 5%;
+  --foreground: 210 40% 98%;
+
+  --border: 214 18% 16%;
+  --input: 214 18% 16%;
+  --ring: 219 100% 65%;
+
+  --card: 216 23% 9%;
+  --card-foreground: 210 40% 98%;
+  --card-border: 214 18% 16%;
+
+  --popover: 216 23% 9%;
+  --popover-foreground: 210 40% 98%;
+  --popover-border: 214 18% 16%;
+
+  --primary: 219 100% 65%;
+  --primary-foreground: 220 30% 6%;
+
+  --secondary: 252 100% 68%;
+  --secondary-foreground: 210 40% 98%;
+
+  --muted: 212 22% 12%;
+  --muted-foreground: 216 20% 74%;
+
+  --accent: 212 22% 12%;
+  --accent-foreground: 210 40% 98%;
+
+  --destructive: 350 100% 68%;
+  --destructive-foreground: 210 40% 98%;
+
+  --chart-1: 219 100% 65%;
+  --chart-2: 252 100% 68%;
+  --chart-3: 159 67% 49%;
+  --chart-4: 350 100% 68%;
+  --chart-5: 36 100% 64%;
+
+  --glass-bg: 11 13 17 / 0.55;
+  --glass-bg-strong: 11 13 17 / 0.74;
+  --glass-bg-subtle: 11 13 17 / 0.34;
+  --glass-border: 255 255 255 / 0.10;
+
+  --skeu-grad: linear-gradient(180deg, hsl(212 22% 13%), hsl(216 24% 8%));
+  --skeu-grad-raised: linear-gradient(180deg, hsl(212 22% 15%), hsl(214 23% 10%));
+  --skeu-raise: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 26px rgb(0 0 0 / 0.45);
+  --skeu-raise-sm: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 1px 2px rgb(0 0 0 / 0.45), 0 4px 12px rgb(0 0 0 / 0.4);
+  --skeu-raise-lg: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 2px 4px rgb(0 0 0 / 0.5), 0 18px 50px rgb(0 0 0 / 0.55);
+  --skeu-inset: inset 0 2px 6px rgb(0 0 0 / 0.6), inset 0 -1px 0 rgb(255 255 255 / 0.04);
+  --skeu-edge: rgb(255 255 255 / 0.07);
+  --skeu-press: inset 0 2px 5px rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(0 0 0 / 0.3);
+
+  --accent-cyan: #4FE5FF;
+  --accent-purple: #7C5CFF;
+  --accent-emerald: #29D398;
+
+  --grid-line: rgba(79, 140, 255, 0.05);
+  --aurora-1: rgba(79, 140, 255, 0.45);
+  --aurora-2: rgba(124, 92, 255, 0.42);
+  --aurora-opacity: 0.35;
+
+  color-scheme: dark;
+}
+
+/* Light theme — softened, lower-saturation neons so they don't vibrate on
+   white. Applied when next-themes writes class="light" on <html>. */
+.light {
+  --background: 0 0% 100%;
+  --foreground: 222 47% 11%;
+
+  --border: 220 13% 88%;
+  --input: 220 13% 88%;
+  --ring: 219 90% 52%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --card-border: 220 13% 90%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --popover-border: 220 13% 90%;
+
+  --primary: 219 90% 52%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 252 80% 60%;
+  --secondary-foreground: 0 0% 100%;
+
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 9% 40%;
+
+  --accent: 220 14% 94%;
+  --accent-foreground: 222 47% 11%;
+
+  --destructive: 0 72% 50%;
+  --destructive-foreground: 0 0% 100%;
+
+  --chart-1: 219 90% 52%;
+  --chart-2: 252 80% 60%;
+  --chart-3: 159 60% 38%;
+  --chart-4: 350 80% 56%;
+  --chart-5: 36 92% 48%;
+
+  /* Light-mode glass: frosted white instead of frosted black */
+  --glass-bg: 255 255 255 / 0.62;
+  --glass-bg-strong: 255 255 255 / 0.80;
+  --glass-bg-subtle: 255 255 255 / 0.40;
+  --glass-border: 15 23 42 / 0.08;
+
+  /* Light-mode skeuomorphic: raised white panels, soft slate shadows */
+  --skeu-grad: linear-gradient(180deg, hsl(0 0% 100%), hsl(220 16% 96%));
+  --skeu-grad-raised: linear-gradient(180deg, hsl(0 0% 100%), hsl(220 16% 97%));
+  --skeu-raise: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px rgb(15 23 42 / 0.08), 0 10px 26px rgb(15 23 42 / 0.1);
+  --skeu-raise-sm: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px rgb(15 23 42 / 0.07), 0 4px 12px rgb(15 23 42 / 0.08);
+  --skeu-raise-lg: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 2px 4px rgb(15 23 42 / 0.08), 0 18px 50px rgb(15 23 42 / 0.14);
+  --skeu-inset: inset 0 2px 6px rgb(15 23 42 / 0.12), inset 0 -1px 0 rgb(255 255 255 / 0.7);
+  --skeu-edge: rgb(15 23 42 / 0.08);
+  --skeu-press: inset 0 2px 5px rgb(15 23 42 / 0.16), inset 0 1px 0 rgb(15 23 42 / 0.06);
+
+  --shadow-elev-1: 0 1px 2px rgba(15,23,42,0.06), 0 4px 16px rgba(15,23,42,0.06);
+  --shadow-elev-2: 0 4px 12px rgba(15,23,42,0.08), 0 12px 40px rgba(15,23,42,0.08);
+  --shadow-elev-3: 0 8px 24px rgba(15,23,42,0.10), 0 24px 70px rgba(15,23,42,0.12);
+
+  --accent-cyan: #2563eb;
+  --accent-purple: #7c3aed;
+  --accent-emerald: #059669;
+
+  --grid-line: rgba(15, 23, 42, 0.045);
+  --aurora-1: rgba(79, 140, 255, 0.30);
+  --aurora-2: rgba(124, 92, 255, 0.26);
+  --aurora-opacity: 0.5;
+
+  color-scheme: light;
 }
 
 @layer base {
   * { @apply border-border; }
-  body { 
+  body {
     @apply font-sans antialiased bg-background text-foreground;
-    /* Animated glowing cyber-grid background */
-    background-image: 
-      linear-gradient(to right, rgba(6, 182, 212, 0.05) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(6, 182, 212, 0.05) 1px, transparent 1px);
+    /* Crisp, clean glyph rendering */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv11", "ss01", "calt", "liga";
+    text-rendering: optimizeLegibility;
+    letter-spacing: -0.011em;
+    /* Animated glowing cyber-grid background (theme-aware) */
+    background-image:
+      linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
     background-size: 50px 50px;
     background-position: center center;
     animation: grid-pan 60s linear infinite;
   }
+
+  /* Futuristic display type for headings — geometric, tight, confident. */
+  h1, h2, h3, h4, h5 {
+    font-family: var(--app-font-display);
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+  /* Tabular, monospaced numerics for data/metrics. */
+  .font-mono { font-feature-settings: "tnum", "zero"; }
+
   button, [role="button"], a, input[type="submit"], input[type="button"] {
     @apply cursor-pointer;
+  }
+  /* Everything interactive eases smoothly (clean, responsive feel). */
+  a, button, [role="button"], summary {
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease,
+      opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
   }
 
   /* Ultra-thin, nearly invisible custom scrollbar */
@@ -161,11 +361,125 @@
 
 @layer utilities {
   input[type="search"]::-webkit-search-cancel-button { @apply hidden; }
-  
-  .glass-panel {
-    @apply bg-black/60 backdrop-blur-xl border border-white/10 shadow-2xl;
+
+  /* ── Skeuomorphic surfaces & controls — the single source of truth ── */
+  /* Raised tactile panel (replaces the old glass cards). */
+  .skeu {
+    background: var(--skeu-grad);
+    border: 1px solid var(--skeu-edge);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--skeu-raise);
   }
-  
+  /* Lighter raise for nested/inline surfaces. */
+  .skeu-sm {
+    background: var(--skeu-grad);
+    border: 1px solid var(--skeu-edge);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--skeu-raise-sm);
+  }
+  /* Concave well — inputs, tracks, code, recessed regions. */
+  .skeu-inset {
+    background: hsl(216 24% 7%);
+    border: 1px solid var(--skeu-edge);
+    border-radius: var(--radius-md);
+    box-shadow: var(--skeu-inset);
+  }
+  .light .skeu-inset { background: hsl(220 16% 95%); }
+  /* Interactive surfaces lift on hover and press in. */
+  .skeu-interactive {
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+  }
+  .skeu-interactive:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--skeu-raise-lg);
+  }
+  .skeu-interactive:active {
+    transform: translateY(0);
+    box-shadow: var(--skeu-press);
+  }
+  /* Tactile button — raised at rest, depresses on press. */
+  .skeu-btn {
+    background: var(--skeu-grad-raised);
+    border: 1px solid var(--skeu-edge);
+    box-shadow: var(--skeu-raise-sm);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.2s ease;
+  }
+  .skeu-btn:hover { filter: brightness(1.08); }
+  .skeu-btn:active { transform: translateY(1px); box-shadow: var(--skeu-press); }
+  /* Primary CTA — electric-blue gradient with top highlight + colored glow. */
+  .skeu-btn-primary {
+    background: linear-gradient(180deg, hsl(219 100% 70%), hsl(219 100% 60%));
+    border: 1px solid hsl(219 100% 74% / 0.6);
+    color: hsl(220 30% 6%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), 0 4px 14px rgb(79 140 255 / 0.45);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.2s ease;
+  }
+  .skeu-btn-primary:hover { filter: brightness(1.06); }
+  .skeu-btn-primary:active {
+    transform: translateY(1px);
+    box-shadow: inset 0 2px 6px rgb(0 0 0 / 0.3), 0 2px 8px rgb(79 140 255 / 0.35);
+  }
+
+  /* ── CSS-3D laptop (no WebGL) — the screen is real, interactive HTML ──── */
+  .laptop-3d { perspective: 1800px; }
+  .laptop-3d-inner { transform-style: preserve-3d; will-change: transform; }
+  .laptop-screen {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    border-radius: clamp(12px, 2vw, 20px);
+    padding: clamp(8px, 1.4vw, 14px);
+    background: linear-gradient(180deg, hsl(214 22% 17%), hsl(216 24% 9%));
+    border: 1px solid var(--skeu-edge);
+    box-shadow: var(--skeu-raise-lg);
+  }
+  /* camera dot */
+  .laptop-screen::before {
+    content: "";
+    position: absolute;
+    top: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+    background: rgb(255 255 255 / 0.22);
+  }
+  .laptop-screen-surface {
+    position: relative;
+    height: 100%;
+    width: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    background: hsl(216 30% 6%);
+    box-shadow: var(--skeu-inset);
+  }
+  .light .laptop-screen-surface { background: hsl(220 16% 97%); }
+  /* front lip / deck */
+  .laptop-base {
+    position: relative;
+    margin: -2px auto 0;
+    width: 112%;
+    height: clamp(10px, 1.6vw, 16px);
+    border-radius: 0 0 14px 14px;
+    background: linear-gradient(180deg, hsl(214 18% 19%), hsl(216 20% 11%));
+    border: 1px solid var(--skeu-edge);
+    box-shadow: 0 26px 50px -12px rgb(0 0 0 / 0.6);
+    transform: rotateX(5deg);
+    transform-origin: top center;
+  }
+  .laptop-base::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 22%;
+    height: 4px;
+    border-radius: 9999px;
+    background: rgb(255 255 255 / 0.06);
+  }
+
   .neon-text-cyan {
     text-shadow: 0 0 10px rgba(6, 182, 212, 0.5), 0 0 20px rgba(6, 182, 212, 0.3);
   }
@@ -204,4 +518,206 @@
   .glow-border-effect:hover::before {
     opacity: 1;
   }
+
+  /* Violet→blue text gradient for headlines (matches the hero "Content Ranks.") */
+  .text-gradient {
+    background-image: linear-gradient(110deg, #a78bfa 0%, #7c5cff 45%, #5b8cff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    /* subtle neon bloom for a futuristic feel */
+    filter: drop-shadow(0 2px 18px rgb(124 92 255 / 0.35));
+  }
+
+  /* Animated aurora backdrop — floating neon orbs behind hero/section content */
+  .aurora-bg {
+    position: relative;
+    isolation: isolate;
+  }
+  .aurora-bg::before,
+  .aurora-bg::after {
+    content: "";
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(80px);
+    opacity: var(--aurora-opacity, 0.35);
+    z-index: -1;
+    pointer-events: none;
+  }
+  .aurora-bg::before {
+    width: 38rem;
+    height: 38rem;
+    top: -12rem;
+    left: -8rem;
+    background: radial-gradient(circle, var(--aurora-1), transparent 70%);
+    animation: aurora-drift-1 18s ease-in-out infinite alternate;
+  }
+  .aurora-bg::after {
+    width: 32rem;
+    height: 32rem;
+    top: 4rem;
+    right: -6rem;
+    background: radial-gradient(circle, var(--aurora-2), transparent 70%);
+    animation: aurora-drift-2 22s ease-in-out infinite alternate;
+  }
+
+  /* ── Cinematic hero stage ─────────────────────────────────────────────
+        Deeper, navier backdrop than the global graphite, scoped to the hero
+        only (does not touch global tokens), matching the reference image. */
+  .hero-stage {
+    background:
+      radial-gradient(1200px 700px at 78% 18%, rgb(124 92 255 / 0.16), transparent 60%),
+      radial-gradient(900px 600px at 12% 30%, rgb(79 140 255 / 0.10), transparent 60%),
+      linear-gradient(180deg, #05060b 0%, #07080f 60%, var(--background-hex, #0b0d11) 100%);
+  }
+  .light .hero-stage {
+    background:
+      radial-gradient(1200px 700px at 78% 18%, rgb(124 92 255 / 0.12), transparent 60%),
+      radial-gradient(900px 600px at 12% 30%, rgb(79 140 255 / 0.10), transparent 60%),
+      linear-gradient(180deg, #eef1f8 0%, #f6f8fc 100%);
+  }
+
+  /* Blue→purple crescent bloom behind the laptop (pairs with the 3D ring) */
+  .neon-glow::after {
+    content: "";
+    position: absolute;
+    top: 46%;
+    right: 4%;
+    width: 38rem;
+    height: 38rem;
+    transform: translateY(-50%);
+    border-radius: 9999px;
+    background: radial-gradient(circle, rgb(79 140 255 / 0.42), rgb(124 92 255 / 0.22) 42%, transparent 68%);
+    filter: blur(60px);
+    pointer-events: none;
+  }
+
+  /* CSS presence orb used inside the AI-visibility screen */
+  .presence-orb {
+    width: 84px;
+    height: 84px;
+    border-radius: 9999px;
+    background: radial-gradient(circle at 35% 30%, #b69cff, #7c5cff 40%, #4f2db0 70%, #1a1140 100%);
+    box-shadow: 0 0 28px 6px rgb(124 92 255 / 0.55), inset 0 0 18px rgb(255 255 255 / 0.25);
+  }
+
+  /* drei <Html transform> wrapper carrying the live dashboard onto the lid */
+  .laptop-html-wrapper { pointer-events: none; }
+  /* Size is set inline from the measured display rectangle so the dashboard sits
+     flush on the real screen; this just styles the panel surface. */
+  .laptop-html-screen {
+    overflow: hidden;
+    border-radius: 6px;
+    background: hsl(216 30% 6%);
+  }
+  .light .laptop-html-screen { background: hsl(220 16% 97%); }
+
+  /* ── Legacy glass/card classes now alias the skeuomorphic surfaces, so
+        existing markup converts automatically. Backdrop-blur is dropped in
+        favor of the tactile raised/inset look. ─────────────────────────── */
+  .glass-panel {
+    background: var(--skeu-grad);
+    border: 1px solid var(--skeu-edge);
+    box-shadow: var(--skeu-raise);
+  }
+  .glass-panel-strong {
+    background: var(--skeu-grad-raised);
+    border: 1px solid var(--skeu-edge);
+    box-shadow: var(--skeu-raise-lg);
+  }
+  .glass-panel-subtle {
+    background: var(--skeu-grad);
+    border: 1px solid var(--skeu-edge);
+    box-shadow: var(--skeu-raise-sm);
+  }
+
+  /* Floating bento/feature surface → raised tactile panel that lifts on hover */
+  .depth-card {
+    background: var(--skeu-grad);
+    border: 1px solid var(--skeu-edge);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--skeu-raise);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+  }
+  .depth-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--skeu-raise-lg);
+  }
+
+  /* Pointer-tracked spotlight backdrop (generalizes glow-border-effect) */
+  .spotlight-bg {
+    position: relative;
+    isolation: isolate;
+  }
+  .spotlight-bg::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      600px circle at var(--mouse-x, 50%) var(--mouse-y, 0),
+      color-mix(in srgb, var(--accent-cyan) 22%, transparent),
+      transparent 60%
+    );
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /* Defer layout/paint of below-the-fold sections until near the viewport */
+  .cv-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 720px;
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-shimmer {
+    background-size: 200% 100%;
+    animation: shimmer 2.5s linear infinite;
+  }
+
+  /* Horizontal marquee for AI-engine logos */
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    animation: marquee 28s linear infinite;
+  }
+  .marquee-track:hover {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes aurora-drift-1 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(6rem, 4rem) scale(1.15); }
+}
+@keyframes aurora-drift-2 {
+  0% { transform: translate(0, 0) scale(1.1); }
+  100% { transform: translate(-5rem, 3rem) scale(0.95); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Respect reduced-motion preferences across all decorative animation */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  body { animation: none !important; }
 }

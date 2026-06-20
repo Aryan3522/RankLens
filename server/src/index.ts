@@ -3,6 +3,7 @@ import "dotenv/config";
 import app from "./app.js";
 import { env } from "./lib/env.js";
 import { logger } from "./lib/logger.js";
+import { chromePool } from "./lib/browser-pool.js";
 
 const port = Number(env.PORT) || 3000;
 
@@ -35,53 +36,80 @@ process.on("uncaughtException", (error) => {
 /**
  * ======================================================
  * START SERVER
+ *
+ * Pre-warm the Chrome pool before accepting traffic.
+ * This avoids cold-start latency on the first request.
  * ======================================================
  */
 
-const server = app.listen(port, "0.0.0.0", () => {
-  logger.info(
-    {
-      port,
-      env: env.NODE_ENV,
-      nodeVersion: process.version,
-    },
-    "Server running",
-  );
-});
+async function start() {
+  try {
+    // Initialize Chrome pool (pre-warms Chrome instances)
+    logger.info("Pre-warming Chrome pool...");
+    await chromePool.initialize();
 
-/**
- * ======================================================
- * GRACEFUL SHUTDOWN
- * ======================================================
- */
+    const server = app.listen(port, "0.0.0.0", () => {
+      logger.info(
+        {
+          port,
+          env: env.NODE_ENV,
+          nodeVersion: process.version,
+          chromePool: chromePool.getStats(),
+        },
+        "Server running",
+      );
+    });
 
-const shutdown = (signal: string) => {
-  logger.warn(
-    {
-      signal,
-    },
-    "Graceful shutdown initiated",
-  );
+    /**
+     * ======================================================
+     * GRACEFUL SHUTDOWN
+     *
+     * 1. Stop accepting new connections
+     * 2. Destroy all pooled Chrome instances
+     * 3. Exit
+     * ======================================================
+     */
 
-  server.close(() => {
-    logger.info("HTTP server closed");
+    const shutdown = async (signal: string) => {
+      logger.warn(
+        {
+          signal,
+        },
+        "Graceful shutdown initiated",
+      );
 
-    process.exit(0);
-  });
+      server.close(async () => {
+        logger.info("HTTP server closed");
 
-  // FORCE EXIT AFTER TIMEOUT
+        // Destroy Chrome pool (kills all Chrome processes)
+        try {
+          await chromePool.destroyAll();
+        } catch (err) {
+          logger.error({ error: err }, "Error destroying Chrome pool");
+        }
 
-  setTimeout(() => {
-    logger.error(
-      "Forced shutdown after timeout",
-    );
+        process.exit(0);
+      });
 
+      // FORCE EXIT AFTER TIMEOUT
+      setTimeout(() => {
+        logger.error(
+          "Forced shutdown after timeout",
+        );
+
+        process.exit(1);
+      }, 15000).unref(); // 15s (up from 10s to allow Chrome cleanup)
+    };
+
+    process.on("SIGINT", () => shutdown("SIGINT"));
+
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+  } catch (err) {
+    logger.fatal({ error: err }, "Failed to start server");
     process.exit(1);
-  }, 10000).unref();
-};
+  }
+}
 
-process.on("SIGINT", () => shutdown("SIGINT"));
-
-process.on("SIGTERM", () => shutdown("SIGTERM"));
+start();
 
 export default app;

@@ -97,7 +97,7 @@ export const ListAnalysesResponse = zod.array(ListAnalysesResponseItem);
 export const CreateAnalysisBody = zod.object({
   url: zod.string(),
   type: zod.enum(["website", "youtube", "instagram"]),
-  projectId: zod.number().nullish(),
+  projectId: zod.coerce.number().nullish(),
 });
 
 /**
