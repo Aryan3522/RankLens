@@ -13,9 +13,6 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"
   },
-  "puppeteer": {
-    "skipDownload": true
-  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
     "@sparticuz/chromium": "^147.0.0",
