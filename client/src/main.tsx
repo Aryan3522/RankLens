@@ -1,7 +1,11 @@
 import { createRoot } from "react-dom/client";
+import { ThemeProvider } from "next-themes";
 import App from "./App";
 import "./index.css";
-import { setBaseUrl } from "@/api";
+import { setBaseUrl, setAuthTokenGetter } from "@/api";
+import { getStoredToken } from "@/api/auth";
+
+setAuthTokenGetter(() => getStoredToken());
 
 // Configure API base URL for production
 let apiUrl = import.meta.env.VITE_API_URL;
@@ -34,4 +38,14 @@ if (apiUrl) {
   setBaseUrl(apiUrl);
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <ThemeProvider
+    attribute="class"
+    defaultTheme="dark"
+    enableSystem={false}
+    disableTransitionOnChange
+    value={{ light: "light", dark: "dark" }}
+  >
+    <App />
+  </ThemeProvider>,
+);

@@ -1,3 +1,7 @@
+## Project guide (read first)
+
+**Read [`RANKLENS_ENGINEERING_GUIDE.md`](./RANKLENS_ENGINEERING_GUIDE.md) before answering questions or writing code.** It is the single source of truth for the tech stack (React 19 + **Vite**, NOT Next.js), the full folder structure, and the design rules (skeuomorphic graphite UI, 4× spacing, responsive + 3D conventions) — so you don't hallucinate structure or styles that don't exist. Product mission/principles are in `RANKLENS_PRODUCT_GUIDELINES.md`.
+
 ## graphify-ts
 
 IMPORTANT: This project has a graphify-ts knowledge graph. You MUST follow these rules:

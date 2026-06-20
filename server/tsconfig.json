@@ -21,9 +21,7 @@
 
     "resolveJsonModule": true,
 
-    "skipLibCheck": true,
-
-    "incremental": true
+    "skipLibCheck": true
   },
 
   "include": ["src/**/*"],

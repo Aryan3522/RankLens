@@ -24,7 +24,9 @@ export default defineConfig(({ mode }) => {
       minify: "esbuild",
       cssMinify: true,
       sourcemap: false,
-      chunkSizeWarningLimit: 600,
+      // vendor-three is large but loaded lazily (only on capable desktops,
+      // after first paint) so it never sits on the critical path.
+      chunkSizeWarningLimit: 900,
       rollupOptions: {
         output: {
           manualChunks: {
@@ -32,6 +34,7 @@ export default defineConfig(({ mode }) => {
             "vendor-ui": ["lucide-react", "@radix-ui/react-slot", "class-variance-authority", "clsx", "tailwind-merge"],
             "vendor-charts": ["recharts"],
             "vendor-query": ["@tanstack/react-query"],
+            "vendor-three": ["three", "@react-three/fiber", "@react-three/drei", "maath"],
           },
         },
       },

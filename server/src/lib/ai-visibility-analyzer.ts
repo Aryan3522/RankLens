@@ -4,13 +4,47 @@ import type { CheerioAPI } from "cheerio";
 // TYPES
 // ======================================================
 
+export type AiCategoryStatus = "strong" | "moderate" | "weak";
+
+export interface AiCategory {
+  /** Stable machine id, e.g. "structured-data". */
+  id: string;
+  /** Human label, e.g. "Structured Data". */
+  label: string;
+  /** Normalized 0-100 score for this single category. */
+  score: number;
+  /** Raw points earned and the max possible (for transparency). */
+  points: number;
+  maxPoints: number;
+  /** Relative weight in the overall AI visibility score. */
+  weight: number;
+  status: AiCategoryStatus;
+  /** Plain-language explanation of why this category matters to AI systems. */
+  whatItMeans: string;
+  strengths: string[];
+  weaknesses: string[];
+  recommendations: string[];
+}
+
+export interface AiEngineReadiness {
+  engine: string;
+  score: number;
+  status: AiCategoryStatus;
+  note: string;
+}
+
 export interface AiVisibilityResult {
   aiVisibilityScore: number;
+  /** Flattened insight arrays — kept for backward compatibility. */
   aiVisibilityInsights: {
     strengths: string[];
     weaknesses: string[];
     recommendations: string[];
   };
+  /** Per-category breakdown so the UI can explain every score. */
+  aiVisibilityCategories: AiCategory[];
+  /** Heuristic readiness per AI answer engine. */
+  aiEngineReadiness: AiEngineReadiness[];
 }
 
 interface CategoryResult {
@@ -19,6 +53,37 @@ interface CategoryResult {
   strengths: string[];
   weaknesses: string[];
   recommendations: string[];
+}
+
+/** Static metadata describing each scored category. */
+const CATEGORY_META: { id: string; label: string; whatItMeans: string }[] = [
+  { id: "structured-data", label: "Structured Data", whatItMeans: "Schema.org / JSON-LD markup lets AI engines reliably identify what your page is about and quote it as a rich answer." },
+  { id: "semantic-html", label: "Semantic HTML", whatItMeans: "Proper headings and HTML5 landmarks help language models parse your page into clean, meaningful sections." },
+  { id: "ai-readability", label: "AI Readability", whatItMeans: "Clear paragraphs and adequate depth make it easy for an AI to extract and summarize your content accurately." },
+  { id: "crawlability", label: "Crawlability", whatItMeans: "If AI crawlers can't access and index the page, none of your content can ever be surfaced in AI answers." },
+  { id: "metadata", label: "Metadata Quality", whatItMeans: "Titles, descriptions and social tags are the snippet AI assistants read first to understand and preview your page." },
+  { id: "faq", label: "FAQ & Conversational", whatItMeans: "Question-and-answer formatting maps directly to how users prompt AI assistants, making your content easy to cite." },
+  { id: "internal-linking", label: "Internal Linking", whatItMeans: "Descriptive internal links teach AI systems how your pages relate, strengthening topical authority." },
+  { id: "performance", label: "Performance Signals", whatItMeans: "Fast, stable pages are crawled more often and prioritized by AI systems that respect Core Web Vitals." },
+  { id: "content-structure", label: "Content Structure", whatItMeans: "Lists, tables and chunked sections are the formats AI engines extract most reliably for direct answers." },
+  { id: "entity-signals", label: "Entity & Topic Signals", whatItMeans: "Clearly named entities and consistent topics help AI models map your page into their knowledge graph." },
+  { id: "eeat", label: "E-E-A-T Signals", whatItMeans: "Authorship, dates and credible references signal Experience, Expertise, Authority and Trust — which AI engines weigh heavily before citing." },
+  { id: "citation-readiness", label: "Citation Readiness", whatItMeans: "Concrete facts, statistics and definitions give AI assistants quotable, verifiable claims to attribute to your page." },
+];
+
+// Engines and which categories most influence their readiness (heuristic).
+const ENGINE_MAP: { engine: string; categories: string[] }[] = [
+  { engine: "ChatGPT", categories: ["crawlability", "ai-readability", "content-structure", "citation-readiness", "faq"] },
+  { engine: "Gemini", categories: ["structured-data", "metadata", "entity-signals", "eeat", "crawlability"] },
+  { engine: "Claude", categories: ["ai-readability", "semantic-html", "content-structure", "citation-readiness", "eeat"] },
+  { engine: "Perplexity", categories: ["citation-readiness", "eeat", "faq", "content-structure", "crawlability"] },
+  { engine: "Copilot", categories: ["metadata", "structured-data", "crawlability", "performance", "semantic-html"] },
+];
+
+function statusFor(score: number): AiCategoryStatus {
+  if (score >= 70) return "strong";
+  if (score >= 40) return "moderate";
+  return "weak";
 }
 
 // ======================================================
@@ -31,7 +96,8 @@ export function analyzeAiVisibility(
   lighthousePerformance: number,
   lighthouseMobile: number,
 ): AiVisibilityResult {
-  const categories = [
+  // Order MUST match CATEGORY_META.
+  const results: CategoryResult[] = [
     analyzeStructuredData($),
     analyzeSemanticHtml($),
     analyzeAiReadability($),
@@ -42,17 +108,36 @@ export function analyzeAiVisibility(
     analyzePerformanceSignals(lighthousePerformance, lighthouseMobile),
     analyzeContentStructure($),
     analyzeEntitySignals($),
+    analyzeEeatSignals($, url),
+    analyzeCitationReadiness($),
   ];
 
-  const totalPoints = categories.reduce((s, c) => s + c.points, 0);
-  const maxPoints = categories.reduce((s, c) => s + c.maxPoints, 0);
+  const categories: AiCategory[] = results.map((r, i) => {
+    const meta = CATEGORY_META[i]!;
+    const score = r.maxPoints > 0 ? Math.round((r.points / r.maxPoints) * 100) : 0;
+    return {
+      id: meta.id,
+      label: meta.label,
+      score: Math.min(100, Math.max(0, score)),
+      points: r.points,
+      maxPoints: r.maxPoints,
+      weight: 1,
+      status: statusFor(score),
+      whatItMeans: meta.whatItMeans,
+      strengths: r.strengths,
+      weaknesses: r.weaknesses,
+      recommendations: r.recommendations,
+    };
+  });
+
+  const totalPoints = results.reduce((s, c) => s + c.points, 0);
+  const maxPoints = results.reduce((s, c) => s + c.maxPoints, 0);
   const score = maxPoints > 0 ? Math.round((totalPoints / maxPoints) * 100) : 0;
 
   const strengths: string[] = [];
   const weaknesses: string[] = [];
   const recommendations: string[] = [];
-
-  for (const cat of categories) {
+  for (const cat of results) {
     strengths.push(...cat.strengths);
     weaknesses.push(...cat.weaknesses);
     recommendations.push(...cat.recommendations);
@@ -61,7 +146,25 @@ export function analyzeAiVisibility(
   return {
     aiVisibilityScore: Math.min(100, Math.max(0, score)),
     aiVisibilityInsights: { strengths, weaknesses, recommendations },
+    aiVisibilityCategories: categories,
+    aiEngineReadiness: computeEngineReadiness(categories),
   };
+}
+
+function computeEngineReadiness(categories: AiCategory[]): AiEngineReadiness[] {
+  const byId = new Map(categories.map((c) => [c.id, c.score]));
+  return ENGINE_MAP.map(({ engine, categories: ids }) => {
+    const scores = ids.map((id) => byId.get(id) ?? 0);
+    const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+    const status = statusFor(avg);
+    const note =
+      status === "strong"
+        ? `Well positioned to be surfaced and cited by ${engine}.`
+        : status === "moderate"
+          ? `Partially optimized for ${engine} — a few fixes would raise citation odds.`
+          : `Unlikely to be surfaced by ${engine} without structural improvements.`;
+    return { engine, score: avg, status, note };
+  });
 }
 
 // ======================================================
@@ -536,6 +639,139 @@ function analyzeEntitySignals($: CheerioAPI): CategoryResult {
   } else {
     r.points += 1;
     r.recommendations.push("Use <strong> or <em> tags to highlight key entities and terms for AI");
+  }
+
+  return r;
+}
+
+// ======================================================
+// 11. E-E-A-T SIGNALS (10 pts)
+//
+// Experience, Expertise, Authority, Trust — the credibility
+// signals AI engines weigh before citing a source.
+// ======================================================
+
+function analyzeEeatSignals($: CheerioAPI, url: string): CategoryResult {
+  const r = empty(10);
+
+  const jsonLd = $('script[type="application/ld+json"]').text().toLowerCase();
+
+  // Authorship (byline markup or Person/author in structured data).
+  const hasAuthorMarkup =
+    $('[rel="author"], [class*="author"], [class*="byline"], [itemprop="author"]').length > 0;
+  const hasAuthorSchema = jsonLd.includes('"author"') || jsonLd.includes("person");
+
+  if (hasAuthorMarkup || hasAuthorSchema) {
+    r.points += 3;
+    r.strengths.push("Author / byline attribution detected — a key trust signal for AI citation");
+  } else {
+    r.weaknesses.push("No clear author attribution — AI engines favor content with identifiable expertise");
+    r.recommendations.push("Add a visible author byline and Person/author structured data to establish expertise");
+  }
+
+  // Freshness (published / modified dates).
+  const hasDates =
+    $('time[datetime], [itemprop="datePublished"], [itemprop="dateModified"]').length > 0 ||
+    jsonLd.includes("datepublished") || jsonLd.includes("datemodified");
+  if (hasDates) {
+    r.points += 2;
+    r.strengths.push("Publish / update dates present — signals content freshness to AI systems");
+  } else {
+    r.weaknesses.push("No published or modified date found — AI engines deprioritize undated content");
+    r.recommendations.push("Add visible publish and last-updated dates (and datePublished/dateModified schema)");
+  }
+
+  // Outbound citations to authoritative sources.
+  let host = "";
+  try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* ignore */ }
+  let authoritativeRefs = 0;
+  const authoritativeHints = [".gov", ".edu", ".org", "wikipedia.org", "doi.org", "who.int", "nih.gov"];
+  $("a[href^='http']").each((_, el) => {
+    const href = ($(el).attr("href") || "").toLowerCase();
+    try {
+      const linkHost = new URL(href).hostname;
+      if (linkHost && !linkHost.includes(host) && authoritativeHints.some((h) => linkHost.endsWith(h) || linkHost.includes(h))) {
+        authoritativeRefs++;
+      }
+    } catch { /* ignore malformed */ }
+  });
+  if (authoritativeRefs >= 2) {
+    r.points += 3;
+    r.strengths.push(`References ${authoritativeRefs} authoritative external sources`);
+  } else if (authoritativeRefs === 1) {
+    r.points += 1;
+    r.recommendations.push("Cite a few more authoritative sources (.gov/.edu/research) to strengthen trust signals");
+  } else {
+    r.weaknesses.push("No citations to authoritative external sources");
+    r.recommendations.push("Link out to reputable sources to back up claims — AI engines reward well-sourced content");
+  }
+
+  // About / contact presence (organizational trust).
+  const hasTrustPages = $('a[href*="about"], a[href*="contact"], a[href*="privacy"]').length > 0;
+  if (hasTrustPages) {
+    r.points += 2;
+    r.strengths.push("About / contact / policy links present — reinforces site trustworthiness");
+  } else {
+    r.recommendations.push("Add About and Contact links so AI systems can verify who is behind the content");
+  }
+
+  return r;
+}
+
+// ======================================================
+// 12. CITATION READINESS (10 pts)
+//
+// Does the page contain concrete, quotable claims that an AI
+// assistant can extract and attribute?
+// ======================================================
+
+function analyzeCitationReadiness($: CheerioAPI): CategoryResult {
+  const r = empty(10);
+
+  const bodyText = $("body").text().replace(/\s+/g, " ").trim();
+
+  // Statistics & quantified facts.
+  const percentMatches = bodyText.match(/\b\d+(?:\.\d+)?\s?%/g) || [];
+  const numberWithUnit = bodyText.match(/\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\s?(?:million|billion|thousand|users|customers|hours|days|years|kg|mb|gb|ms|x)\b/gi) || [];
+  const factCount = percentMatches.length + numberWithUnit.length;
+
+  if (factCount >= 3) {
+    r.points += 4;
+    r.strengths.push(`Contains ${factCount} quantified facts/statistics that AI engines can cite`);
+  } else if (factCount >= 1) {
+    r.points += 2;
+    r.recommendations.push("Add more concrete statistics and figures — AI assistants prefer quoting specific numbers");
+  } else {
+    r.weaknesses.push("No statistics or quantified facts found — little for AI engines to quote verbatim");
+    r.recommendations.push("Include concrete data points, percentages, and figures to become citation-worthy");
+  }
+
+  // Definition-style sentences ("X is/are/refers to …").
+  const definitionPattern = /\b[A-Z][\w\s-]{2,40}\s+(?:is|are|refers to|means|is defined as)\s+[a-z]/g;
+  const definitions = bodyText.match(definitionPattern) || [];
+  if (definitions.length >= 2) {
+    r.points += 3;
+    r.strengths.push("Clear definition-style statements detected — ideal for AI answer extraction");
+  } else if (definitions.length === 1) {
+    r.points += 1;
+  } else {
+    r.recommendations.push("Phrase key concepts as clear definitions ('X is …') so AI can extract concise answers");
+  }
+
+  // Quotable structured data: tables of facts.
+  const tables = $("table").length;
+  if (tables > 0) {
+    r.points += 2;
+    r.strengths.push("Data tables present — a highly quotable, structured format for AI engines");
+  } else {
+    r.recommendations.push("Present comparative or numeric data in tables to make it easy for AI to cite");
+  }
+
+  // Blockquotes / cited references.
+  const quotes = $("blockquote, cite").length;
+  if (quotes > 0) {
+    r.points += 1;
+    r.strengths.push("Quotations / citations present, reinforcing source credibility");
   }
 
   return r;

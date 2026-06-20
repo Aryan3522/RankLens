@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { storage } from "@/lib/storage";
-import { customFetch } from "@/api/custom-fetch";
+import { customFetch, ApiError } from "@/api/custom-fetch";
 
 // Helper Query Keys
 export const getListProjectsQueryKey = () => ["projects"];
@@ -118,7 +118,7 @@ export function useCreateAnalysis() {
         data.url,
         data.type,
         pending.id,
-        data.projectId ? String(data.projectId) : undefined,
+        data.projectId ? Number(data.projectId) : undefined,
       );
       return pending;
     },
@@ -131,16 +131,29 @@ async function runBackendAnalysisAndSave(
   url: string,
   type: string,
   localId: string,
-  projectId?: string,
+  projectId?: number,
 ) {
   try {
+    const body: Record<string, unknown> = { url, type };
+    if (projectId !== undefined) body.projectId = projectId;
     const result: any = await customFetch("/api/analyses", {
       method: "POST",
-      body: JSON.stringify({ url, type, projectId }),
+      body: JSON.stringify(body),
       headers: { "Content-Type": "application/json" },
     });
 
     const analysisData = result.data || result;
+
+    // YouTube / Instagram (and any other not-yet-supported type) come back
+    // flagged rather than scored — render a "coming soon" state, never fake data.
+    if (analysisData.unsupported) {
+      await storage.analyses.update(localId, {
+        status: "unsupported",
+        message: analysisData.message ?? "This content type is not yet supported.",
+        completedAt: new Date().toISOString(),
+      });
+      return;
+    }
 
     await storage.analyses.update(localId, {
       status: "completed",
@@ -167,6 +180,11 @@ async function runBackendAnalysisAndSave(
       speedIndex: analysisData.speedIndex,
       aiVisibilityScore: analysisData.aiVisibilityScore,
       aiVisibilityInsights: analysisData.aiVisibilityInsights,
+      aiVisibilityCategories: analysisData.aiVisibilityCategories,
+      aiEngineReadiness: analysisData.aiEngineReadiness,
+      actionPlan: analysisData.actionPlan,
+      summary: analysisData.summary,
+      llmSummary: analysisData.llmSummary,
       completedAt: new Date().toISOString(),
     });
 
@@ -182,7 +200,25 @@ async function runBackendAnalysisAndSave(
     }
   } catch (err) {
     console.error("Backend analysis failed", err);
-    await storage.analyses.update(localId, { status: "failed" });
+
+    // Surface a precise reason onto the record so the UI can react —
+    // e.g. a 429 drives the rate-limit countdown dialog, a 400 explains why.
+    let message = "Analysis failed. Please try again.";
+    let retryAfter: number | null = null;
+
+    if (err instanceof ApiError) {
+      const data = err.data as { error?: string; retryAfter?: number } | null;
+      if (err.status === 429) {
+        retryAfter = data?.retryAfter ?? 60;
+        message = data?.error ?? "Please wait before starting another analysis.";
+      } else if (err.status === 400) {
+        message = data?.error ?? "The URL could not be analyzed.";
+      } else if (data?.error) {
+        message = data.error;
+      }
+    }
+
+    await storage.analyses.update(localId, { status: "failed", message, retryAfter });
   }
 }
 
@@ -315,6 +351,14 @@ export function useGetDashboardSummary() {
           )
         : null;
 
+      const withAi = completed.filter((a) => a.aiVisibilityScore != null);
+      const avgAiVisibility = withAi.length
+        ? Math.round(
+            withAi.reduce((acc, a) => acc + (a.aiVisibilityScore || 0), 0) /
+              withAi.length,
+          )
+        : null;
+
       let criticalIssues = 0;
       for (const a of completed) {
         const issues = await storage.seoIssues.getByAnalysisId(a.id);
@@ -333,6 +377,7 @@ export function useGetDashboardSummary() {
         totalAnalyses: analyses.length,
         totalKeywords: keywords.length,
         avgSeoScore,
+        avgAiVisibility,
         criticalIssues,
         pendingAnalyses: analyses.filter(
           (a) => a.status === "running" || a.status === "queued",
