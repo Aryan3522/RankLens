@@ -1,4 +1,5 @@
 import { launch, type LaunchedChrome } from "chrome-launcher";
+import puppeteer from "puppeteer";
 import chromium from "@sparticuz/chromium";
 
 import { logger } from "./logger.js";
@@ -68,15 +69,24 @@ async function resolveChromePath(): Promise<string | undefined> {
     return resolvedChromePath;
   }
 
-  // 2. Production: try @sparticuz/chromium first (works on Render/Lambda),
-  //    then fall back to common system paths (apt-get installed Chromium)
+  // 2. Production: try bundled Chromium from `puppeteer` first (most reliable
+  //    on Render — downloaded during npm install), then @sparticuz/chromium
+  //    (Lambda/serverless), then system paths (apt-get).
   if (env.NODE_ENV === "production") {
+    try {
+      resolvedChromePath = puppeteer.executablePath();
+      logger.info({ path: resolvedChromePath }, "Using puppeteer (bundled Chromium)");
+      return resolvedChromePath;
+    } catch (err) {
+      logger.warn({ error: err }, "puppeteer executablePath unavailable");
+    }
+
     try {
       resolvedChromePath = await chromium.executablePath();
       logger.info({ path: resolvedChromePath }, "Using @sparticuz/chromium");
       return resolvedChromePath;
     } catch (err) {
-      logger.warn({ error: err }, "@sparticuz/chromium unavailable, trying system paths");
+      logger.warn({ error: err }, "@sparticuz/chromium unavailable");
     }
 
     const { existsSync } = await import("fs");
@@ -95,7 +105,7 @@ async function resolveChromePath(): Promise<string | undefined> {
       }
     }
 
-    logger.warn("No Chrome/Chromium found via @sparticuz/chromium or system paths");
+    logger.warn("No Chrome/Chromium found via puppeteer, @sparticuz/chromium, or system paths");
   }
 
   // 3. Development: let chrome-launcher auto-detect
