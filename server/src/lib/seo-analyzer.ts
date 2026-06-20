@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import puppeteer from "puppeteer-core";
+import puppeteer from "puppeteer";
 
 import { logger } from "./logger.js";
 

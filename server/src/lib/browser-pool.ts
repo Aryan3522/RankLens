@@ -1,4 +1,5 @@
 import { launch, type LaunchedChrome } from "chrome-launcher";
+import puppeteer from "puppeteer";
 import chromium from "@sparticuz/chromium";
 
 import { logger } from "./logger.js";
@@ -68,24 +69,50 @@ async function resolveChromePath(): Promise<string | undefined> {
     return resolvedChromePath;
   }
 
-  // 2. Production: try @sparticuz/chromium first (works on Render/Lambda),
-  //    then fall back to common system paths (apt-get installed Chromium)
+  // 2. Production: try bundled Chromium from `puppeteer` first (most reliable
+  //    on Render — downloaded during npm install), then @sparticuz/chromium
+  //    (Lambda/serverless), then system paths (apt-get).
   if (env.NODE_ENV === "production") {
+    try {
+      resolvedChromePath = puppeteer.executablePath();
+      logger.info({ path: resolvedChromePath }, "Using puppeteer (bundled Chromium)");
+      return resolvedChromePath;
+    } catch (err) {
+      logger.warn({ error: err }, "puppeteer executablePath unavailable");
+    }
+
     try {
       resolvedChromePath = await chromium.executablePath();
       logger.info({ path: resolvedChromePath }, "Using @sparticuz/chromium");
       return resolvedChromePath;
     } catch (err) {
-      logger.warn({ error: err }, "@sparticuz/chromium unavailable, trying system paths");
+      logger.warn({ error: err }, "@sparticuz/chromium unavailable");
     }
 
     const { existsSync } = await import("fs");
-    const systemPaths = [
+    const { homedir } = await import("os");
+
+    // Platform-specific common Chrome/Chromium paths
+    const systemPaths: string[] = [
+      // Linux (Debian/Ubuntu)
       "/usr/bin/chromium-browser",
       "/usr/bin/chromium",
       "/usr/bin/google-chrome-stable",
       "/usr/bin/google-chrome",
+      "/snap/bin/chromium",
+      "/usr/lib/chromium-browser/chromium-browser",
+      "/opt/google/chrome/chrome",
+      // macOS
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "/Applications/Chromium.app/Contents/MacOS/Chromium",
+      `${homedir()}/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`,
+      `${homedir()}/Applications/Chromium.app/Contents/MacOS/Chromium`,
+      // Windows (via WSL / cross-compile)
+      "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe",
+      "/mnt/c/Program Files (x86)/Google/Chrome/Application/chrome.exe",
     ];
+    // On Windows, chrome-launcher will find Chrome via registry —
+    // no need for explicit paths here.
 
     for (const p of systemPaths) {
       if (existsSync(p)) {
@@ -95,7 +122,7 @@ async function resolveChromePath(): Promise<string | undefined> {
       }
     }
 
-    logger.warn("No Chrome/Chromium found via @sparticuz/chromium or system paths");
+    logger.warn("No Chrome/Chromium found via puppeteer, @sparticuz/chromium, or system paths");
   }
 
   // 3. Development: let chrome-launcher auto-detect
